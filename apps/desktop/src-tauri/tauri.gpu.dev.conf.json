@@ -1,0 +1,12 @@
+{
+  "productName": "OS Voice GPU (dev)",
+  "identifier": "com.osvoice.desktop.gpu.dev",
+  "mainBinaryName": "OS Voice GPU (dev)",
+  "plugins": {
+    "updater": {
+      "endpoints": [
+        ""
+      ]
+    }
+  }
+}

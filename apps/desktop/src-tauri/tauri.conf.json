@@ -1,0 +1,67 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "OS Voice",
+  "version": "0.1.0",
+  "identifier": "com.osvoice.desktop",
+  "build": {
+    "beforeDevCommand": "npm run dev:vite",
+    "devUrl": "http://localhost:1420",
+    "beforeBuildCommand": "npm run build",
+    "frontendDist": "../dist"
+  },
+  "app": {
+    "macOSPrivateApi": true,
+    "windows": [
+      {
+        "title": "OS Voice",
+        "width": 900,
+        "height": 610,
+        "minWidth": 800,
+        "minHeight": 600
+      }
+    ],
+    "security": {
+      "csp": null,
+      "assetProtocol": {
+        "enable": true,
+        "scope": [
+          "$APPDATA/transcription-audio/**"
+        ]
+      }
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "createUpdaterArtifacts": true,
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ],
+    "resources": [],
+    "macOS": {
+      "hardenedRuntime": true,
+      "minimumSystemVersion": "13.3",
+      "entitlements": "macos/OSVoice.entitlements"
+    },
+    "windows": {
+      "webviewInstallMode": {
+        "type": "offlineInstaller"
+      }
+    }
+  },
+  "plugins": {
+    "sql": {
+      "preload": [
+        "sqlite:osvoice.db"
+      ]
+    },
+    "updater": {
+      "endpoints": [],
+      "pubkey": "__UPDATER_PUBLIC_KEY__"
+    }
+  }
+}

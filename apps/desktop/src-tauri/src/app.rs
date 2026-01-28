@@ -1,0 +1,263 @@
+use sqlx::sqlite::SqlitePoolOptions;
+use tauri::{Manager, WindowEvent};
+
+const AUTOSTART_HIDDEN_ARG: &str = "--osvoice-autostart-hidden";
+
+pub fn build() -> tauri::Builder<tauri::Wry> {
+    let updater_builder = tauri_plugin_updater::Builder::new();
+
+    tauri::Builder::default()
+        .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
+            // When a second instance is launched, bring the existing window to the foreground
+            if let Some(window) = app.get_webview_window("main") {
+                let _ = crate::platform::window::surface_main_window(&window);
+            }
+        }))
+        .plugin(tauri_plugin_autostart::init(
+            tauri_plugin_autostart::MacosLauncher::LaunchAgent,
+            Some(vec![AUTOSTART_HIDDEN_ARG.into()]),
+        ))
+        .plugin(tauri_plugin_process::init())
+        .plugin(
+            tauri_plugin_sql::Builder::new()
+                .add_migrations(crate::db::DB_CONNECTION, crate::db::migrations())
+                .build(),
+        )
+        .plugin(updater_builder.build())
+        .plugin(tauri_plugin_os::init())
+        .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_http::init())
+        .on_window_event(|window, event| {
+            if let WindowEvent::CloseRequested { api, .. } = event {
+                api.prevent_close();
+                if window.label() == "main" {
+                    let _ = window.hide();
+                    #[cfg(target_os = "macos")]
+                    {
+                        if let Err(err) = crate::platform::macos::dock::hide_dock_icon() {
+                            eprintln!("Failed to hide dock icon: {err}");
+                        }
+                    }
+                }
+            }
+        })
+        .setup(|app| {
+            eprintln!("[app] Starting application setup...");
+
+            // Write startup diagnostics for debugging
+            crate::system::diagnostics::write_startup_diagnostics(app.handle());
+
+            let db_url = {
+                let handle = app.handle();
+                crate::system::paths::database_url(&handle)
+                    .map_err(|err| -> Box<dyn std::error::Error> { Box::new(err) })?
+            };
+
+            let pool = tauri::async_runtime::block_on(async {
+                SqlitePoolOptions::new()
+                    .max_connections(5)
+                    .connect(&db_url)
+                    .await
+            })
+            .map_err(|err| -> Box<dyn std::error::Error> { Box::new(err) })?;
+
+            app.manage(crate::state::OptionKeyDatabase::new(pool.clone()));
+            app.manage(crate::state::GoogleOAuthState::from_env());
+            app.manage(crate::state::OverlayState::new());
+
+            #[cfg(desktop)]
+            {
+                if std::env::args().any(|arg| arg == AUTOSTART_HIDDEN_ARG) {
+                    if let Some(main_window) = app.get_webview_window("main") {
+                        let _ = main_window.hide();
+                        #[cfg(target_os = "macos")]
+                        {
+                            if let Err(err) = crate::platform::macos::dock::hide_dock_icon() {
+                                eprintln!("Failed to hide dock icon on autostart: {err}");
+                            }
+                        }
+                    }
+                }
+
+                crate::system::tray::setup_tray(app)
+                    .map_err(|err| -> Box<dyn std::error::Error> { Box::new(err) })?;
+
+                let app_handle = app.handle();
+
+                use crate::platform::Recorder;
+                use std::sync::Arc;
+
+                let transcriber_state = crate::state::TranscriberState::new();
+
+                let recorder: Arc<dyn Recorder> =
+                    Arc::new(crate::platform::audio::RecordingManager::new());
+
+                app.manage(recorder);
+                app.manage(transcriber_state);
+
+                let pool_for_bg = pool.clone();
+                let app_handle_for_bg = app_handle.clone();
+                tauri::async_runtime::spawn(async move {
+                    let transcription_mode =
+                        crate::db::preferences_queries::fetch_transcription_mode(pool_for_bg)
+                            .await
+                            .ok()
+                            .flatten();
+
+                    let should_init_whisper = match transcription_mode.as_deref() {
+                        None | Some("local") => true,
+                        _ => false,
+                    };
+
+                    if should_init_whisper {
+                        eprintln!("[app] Transcription mode is local or unset, initializing Whisper in background...");
+                        if let Err(err) =
+                            initialize_transcriber_background(&app_handle_for_bg).await
+                        {
+                            eprintln!("[app] Background Whisper initialization failed: {err}");
+                        }
+                    } else {
+                        eprintln!(
+                            "[app] Transcription mode is '{}', skipping Whisper initialization",
+                            transcription_mode.as_deref().unwrap_or("unknown")
+                        );
+                    }
+                });
+
+                // Pre-warm audio output for instant chime playback
+                crate::system::audio_feedback::warm_audio_output();
+
+                crate::overlay::ensure_pill_overlay_window(&app_handle)
+                    .map_err(|err| -> Box<dyn std::error::Error> { Box::new(err) })?;
+
+                crate::overlay::ensure_toast_overlay_window(&app_handle)
+                    .map_err(|err| -> Box<dyn std::error::Error> { Box::new(err) })?;
+
+                crate::overlay::ensure_agent_overlay_window(&app_handle)
+                    .map_err(|err| -> Box<dyn std::error::Error> { Box::new(err) })?;
+
+                if let Some(pill_window) =
+                    app_handle.get_webview_window(crate::overlay::PILL_OVERLAY_LABEL)
+                {
+                    let _ = crate::platform::window::show_overlay_no_focus(&pill_window);
+                    let _ = crate::platform::window::set_overlay_click_through(&pill_window, true);
+                }
+
+                if let Some(toast_window) =
+                    app_handle.get_webview_window(crate::overlay::TOAST_OVERLAY_LABEL)
+                {
+                    let _ = crate::platform::window::show_overlay_no_focus(&toast_window);
+                    let _ = crate::platform::window::set_overlay_click_through(&toast_window, true);
+                }
+
+                if let Some(agent_window) =
+                    app_handle.get_webview_window(crate::overlay::AGENT_OVERLAY_LABEL)
+                {
+                    let _ = crate::platform::window::show_overlay_no_focus(&agent_window);
+                    let _ = crate::platform::window::set_overlay_click_through(&agent_window, true);
+                }
+
+                crate::overlay::start_cursor_follower(app_handle.clone());
+            }
+
+            // Open dev tools if OSVOICE_ENABLE_DEVTOOLS is set
+            if std::env::var("OSVOICE_ENABLE_DEVTOOLS").is_ok() {
+                eprintln!("[app] OSVOICE_ENABLE_DEVTOOLS detected, opening dev tools...");
+                if let Some(main_window) = app.get_webview_window("main") {
+                    main_window.open_devtools();
+                }
+            }
+
+            Ok(())
+        })
+        .invoke_handler(tauri::generate_handler![
+            crate::commands::user_get_one,
+            crate::commands::user_set_one,
+            crate::commands::user_preferences_get,
+            crate::commands::start_google_sign_in,
+            crate::commands::user_preferences_set,
+            crate::commands::list_microphones,
+            crate::commands::list_gpus,
+            crate::commands::get_screen_visible_area,
+            crate::commands::get_monitor_at_cursor,
+            crate::commands::check_microphone_permission,
+            crate::commands::request_microphone_permission,
+            crate::commands::check_accessibility_permission,
+            crate::commands::request_accessibility_permission,
+            crate::commands::get_current_app_info,
+            crate::commands::app_target_upsert,
+            crate::commands::app_target_list,
+            crate::commands::start_recording,
+            crate::commands::stop_recording,
+            crate::commands::store_transcription_audio,
+            crate::commands::storage_upload_data,
+            crate::commands::storage_get_download_url,
+            crate::commands::transcribe_audio,
+            crate::commands::surface_main_window,
+            crate::commands::set_toast_overlay_click_through,
+            crate::commands::set_agent_overlay_click_through,
+            crate::commands::restore_overlay_focus,
+            crate::commands::paste,
+            crate::commands::transcription_create,
+            crate::commands::transcription_list,
+            crate::commands::transcription_delete,
+            crate::commands::transcription_update,
+            crate::commands::transcription_audio_load,
+            crate::commands::purge_stale_transcription_audio,
+            crate::commands::term_create,
+            crate::commands::term_update,
+            crate::commands::term_list,
+            crate::commands::term_delete,
+            crate::commands::hotkey_list,
+            crate::commands::hotkey_save,
+            crate::commands::hotkey_delete,
+            crate::commands::set_tray_title,
+            crate::commands::api_key_create,
+            crate::commands::api_key_list,
+            crate::commands::api_key_delete,
+            crate::commands::api_key_update,
+            crate::commands::tone_upsert,
+            crate::commands::tone_list,
+            crate::commands::tone_get,
+            crate::commands::tone_delete,
+            crate::commands::clear_local_data,
+            crate::commands::set_phase,
+            crate::commands::set_pill_hover_enabled,
+            crate::commands::start_key_listener,
+            crate::commands::stop_key_listener,
+            crate::commands::play_audio,
+            crate::commands::get_text_field_info,
+            crate::commands::get_screen_context,
+            crate::commands::get_selected_text,
+            crate::commands::initialize_local_transcriber,
+        ])
+}
+
+async fn initialize_transcriber_background(app: &tauri::AppHandle) -> Result<(), String> {
+    use std::sync::Arc;
+    use tauri::Manager;
+
+    let transcriber_state = app.state::<crate::state::TranscriberState>();
+    if transcriber_state.is_initialized() {
+        return Ok(());
+    }
+
+    let default_model_size = crate::system::models::WhisperModelSize::default();
+    let app_clone = app.clone();
+    let model_path = tauri::async_runtime::spawn_blocking(move || {
+        crate::system::models::ensure_whisper_model(&app_clone, default_model_size)
+            .map_err(|err| err.to_string())
+    })
+    .await
+    .map_err(|err| err.to_string())??;
+
+    let new_transcriber: Arc<dyn crate::platform::Transcriber> = Arc::new(
+        crate::platform::whisper::WhisperTranscriber::new(&model_path)
+            .map_err(|err| format!("Failed to initialize Whisper transcriber: {err}"))?,
+    );
+
+    let _ = transcriber_state.initialize(new_transcriber);
+    eprintln!("[app] Background Whisper initialization completed successfully");
+
+    Ok(())
+}

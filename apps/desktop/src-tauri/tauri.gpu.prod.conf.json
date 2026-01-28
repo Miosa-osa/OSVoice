@@ -1,0 +1,19 @@
+{
+  "productName": "OS Voice GPU",
+  "identifier": "com.osvoice.desktop.gpu",
+  "mainBinaryName": "OS Voice GPU",
+  "bundle": {
+    "linux": {
+      "deb": {
+        "depends": ["libxdo3", "libvulkan1"]
+      }
+    }
+  },
+  "plugins": {
+    "updater": {
+      "endpoints": [
+        ""
+      ]
+    }
+  }
+}
