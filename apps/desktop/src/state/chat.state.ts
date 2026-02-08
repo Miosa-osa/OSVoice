@@ -6,6 +6,7 @@ export type ChatState = {
   messageIds: string[];
   isStreaming: boolean;
   streamingContent: string;
+  pendingQuickBarQuery: Nullable<string>;
 };
 
 export const INITIAL_CHAT_STATE: ChatState = {
@@ -14,4 +15,5 @@ export const INITIAL_CHAT_STATE: ChatState = {
   messageIds: [],
   isStreaming: false,
   streamingContent: "",
+  pendingQuickBarQuery: null,
 };

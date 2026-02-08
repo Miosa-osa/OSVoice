@@ -1,7 +1,7 @@
 import { Box, Stack, Typography } from "@mui/material";
-import { useCallback, useEffect } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import { FormattedMessage } from "react-intl";
-import { useAppStore } from "../../store";
+import { produceAppState, useAppStore } from "../../store";
 import {
   loadConversationMessages,
   sendChatMessage,
@@ -17,6 +17,8 @@ export default function ChatPage() {
   );
   const messageIds = useAppStore((state) => state.chat.messageIds);
   const isStreaming = useAppStore((state) => state.chat.isStreaming);
+  const pendingQuery = useAppStore((state) => state.chat.pendingQuickBarQuery);
+  const pendingHandled = useRef(false);
 
   useEffect(() => {
     if (activeConversationId) {
@@ -37,6 +39,18 @@ export default function ChatPage() {
     },
     [activeConversationId],
   );
+
+  useEffect(() => {
+    if (pendingQuery && !pendingHandled.current) {
+      pendingHandled.current = true;
+      produceAppState((draft) => {
+        draft.chat.pendingQuickBarQuery = null;
+      });
+      void handleSend(pendingQuery);
+    } else if (!pendingQuery) {
+      pendingHandled.current = false;
+    }
+  }, [pendingQuery, handleSend]);
 
   return (
     <Stack

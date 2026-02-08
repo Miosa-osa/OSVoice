@@ -27,11 +27,11 @@ export const ChatMessageBubble = ({ messageId }: ChatMessageBubbleProps) => {
           py: 1.5,
           borderRadius: 3,
           backgroundColor: isUser
-            ? theme.vars.palette.blue
-            : theme.vars.palette.level1,
+            ? theme.vars?.palette.blue
+            : theme.vars?.palette.level1,
           color: isUser
-            ? theme.vars.palette.onBlue
-            : theme.vars.palette.text.primary,
+            ? theme.vars?.palette.onBlue
+            : theme.vars?.palette.text.primary,
           backdropFilter: isUser ? "none" : "blur(20px)",
         })}
       >

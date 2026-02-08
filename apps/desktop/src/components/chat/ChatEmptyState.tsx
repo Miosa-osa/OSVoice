@@ -16,7 +16,7 @@ export const ChatEmptyState = () => {
         <AutoAwesomeRounded
           sx={(theme) => ({
             fontSize: 48,
-            color: theme.vars.palette.blue,
+            color: theme.vars?.palette.blue,
             opacity: 0.6,
           })}
         />

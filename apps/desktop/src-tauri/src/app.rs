@@ -136,6 +136,9 @@ pub fn build() -> tauri::Builder<tauri::Wry> {
                 crate::overlay::ensure_agent_overlay_window(&app_handle)
                     .map_err(|err| -> Box<dyn std::error::Error> { Box::new(err) })?;
 
+                crate::overlay::ensure_quick_bar_overlay_window(&app_handle)
+                    .map_err(|err| -> Box<dyn std::error::Error> { Box::new(err) })?;
+
                 if let Some(pill_window) =
                     app_handle.get_webview_window(crate::overlay::PILL_OVERLAY_LABEL)
                 {
@@ -155,6 +158,12 @@ pub fn build() -> tauri::Builder<tauri::Wry> {
                 {
                     let _ = crate::platform::window::show_overlay_no_focus(&agent_window);
                     let _ = crate::platform::window::set_overlay_click_through(&agent_window, true);
+                }
+
+                if let Some(quick_bar_window) =
+                    app_handle.get_webview_window(crate::overlay::QUICK_BAR_OVERLAY_LABEL)
+                {
+                    let _ = crate::platform::window::show_overlay_no_focus(&quick_bar_window);
                 }
 
                 crate::overlay::start_cursor_follower(app_handle.clone());

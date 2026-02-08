@@ -26,7 +26,7 @@ const AppWrapper = () => {
   );
 };
 
-const router = createBrowserRouter([
+export const router = createBrowserRouter([
   {
     path: "/",
     element: <Root />,

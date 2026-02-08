@@ -36,8 +36,8 @@ export const ChatInput = ({ onSend, disabled }: ChatInputProps) => {
       sx={(theme) => ({
         px: 3,
         py: 2,
-        borderTop: `1px solid ${theme.vars.palette.level2}`,
-        backgroundColor: theme.vars.palette.level0,
+        borderTop: `1px solid ${theme.vars?.palette.level2}`,
+        backgroundColor: theme.vars?.palette.level0,
       })}
     >
       <Box
@@ -45,7 +45,7 @@ export const ChatInput = ({ onSend, disabled }: ChatInputProps) => {
           display: "flex",
           alignItems: "flex-end",
           gap: 1,
-          backgroundColor: theme.vars.palette.level1,
+          backgroundColor: theme.vars?.palette.level1,
           borderRadius: 3,
           px: 2,
           py: 1,
@@ -77,8 +77,8 @@ export const ChatInput = ({ onSend, disabled }: ChatInputProps) => {
           size="small"
           sx={(theme) => ({
             color: value.trim()
-              ? theme.vars.palette.blue
-              : theme.vars.palette.text.secondary,
+              ? theme.vars?.palette.blue
+              : theme.vars?.palette.text.secondary,
           })}
         >
           <SendRounded />
