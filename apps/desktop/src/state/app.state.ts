@@ -2,9 +2,11 @@ import { HandlerOutput } from "@repo/functions";
 import {
   ApiKey,
   AppTarget,
+  Conversation,
   FullConfig,
   Hotkey,
   Member,
+  Message,
   Nullable,
   Term,
   Tone,
@@ -36,6 +38,7 @@ import {
   TranscriptionsState,
 } from "./transcriptions.state";
 import { INITIAL_UPDATER_STATE, UpdaterState } from "./updater.state";
+import { ChatState, INITIAL_CHAT_STATE } from "./chat.state";
 import { Vector2 } from "../types/math.types";
 
 export type SnackbarMode = "info" | "success" | "error";
@@ -64,6 +67,8 @@ export type AppState = {
   hotkeyById: Record<string, Hotkey>;
   apiKeyById: Record<string, ApiKey>;
   toneById: Record<string, Tone>;
+  conversationById: Record<string, Conversation>;
+  messageById: Record<string, Message>;
   config: Nullable<FullConfig>;
   priceValueByKey: Record<string, PriceValue>;
 
@@ -78,6 +83,7 @@ export type AppState = {
   pricing: PricingState;
   login: LoginState;
   agent: AgentState;
+  chat: ChatState;
 
   snackbarMessage?: string;
   snackbarCounter: number;
@@ -103,6 +109,8 @@ export const INITIAL_APP_STATE: AppState = {
   priceValueByKey: {},
   apiKeyById: {},
   toneById: {},
+  conversationById: {},
+  messageById: {},
   overlayPhase: "idle",
   audioLevels: [],
   permissions: {
@@ -123,6 +131,7 @@ export const INITIAL_APP_STATE: AppState = {
   currentToast: null,
   overlayCursor: null,
   agent: INITIAL_AGENT_STATE,
+  chat: INITIAL_CHAT_STATE,
   onboarding: INITIAL_ONBOARDING_STATE,
   transcriptions: INITIAL_TRANSCRIPTIONS_STATE,
   dictionary: INITIAL_DICTIONARY_STATE,

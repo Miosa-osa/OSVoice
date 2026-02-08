@@ -230,6 +230,12 @@ pub fn build() -> tauri::Builder<tauri::Wry> {
             crate::commands::get_screen_context,
             crate::commands::get_selected_text,
             crate::commands::initialize_local_transcriber,
+            crate::commands::conversation_create,
+            crate::commands::conversation_list,
+            crate::commands::conversation_update,
+            crate::commands::conversation_delete,
+            crate::commands::message_create,
+            crate::commands::message_list,
         ])
 }
 

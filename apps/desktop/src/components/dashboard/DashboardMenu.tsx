@@ -1,4 +1,5 @@
 import {
+  AutoAwesomeOutlined,
   BarChartOutlined,
   ClassOutlined,
   HistoryOutlined,
@@ -25,6 +26,11 @@ const navItems: NavItem[] = [
     label: <FormattedMessage defaultMessage="Home" />,
     path: "/dashboard",
     icon: <HomeOutlined />,
+  },
+  {
+    label: <FormattedMessage defaultMessage="Chat" />,
+    path: "/dashboard/chat",
+    icon: <AutoAwesomeOutlined />,
   },
   {
     label: <FormattedMessage defaultMessage="History" />,

@@ -14,6 +14,7 @@ import DictionaryPage from "./components/dictionary/DictionaryPage.tsx";
 import StylingPage from "./components/styling/StylingPage.tsx";
 import StatsPage from "./components/stats/StatsPage.tsx";
 import AppsPage from "./components/apps/AppsPage.tsx";
+import ChatPage from "./components/chat/ChatPage.tsx";
 import WelcomePage from "./components/welcome/WelcomePage.tsx";
 import LoginPage from "./components/login/LoginPage.tsx";
 
@@ -104,6 +105,10 @@ const router = createBrowserRouter([
               {
                 path: "styling",
                 element: <StylingPage />,
+              },
+              {
+                path: "chat",
+                element: <ChatPage />,
               },
               {
                 path: "stats",
