@@ -1,4 +1,6 @@
 import { Box, Typography } from "@mui/material";
+import Markdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import { useAppStore } from "../../store";
 
 type ChatMessageBubbleProps = {
@@ -35,16 +37,68 @@ export const ChatMessageBubble = ({ messageId }: ChatMessageBubbleProps) => {
           backdropFilter: isUser ? "none" : "blur(20px)",
         })}
       >
-        <Typography
-          variant="body2"
-          sx={{
-            whiteSpace: "pre-wrap",
-            wordBreak: "break-word",
-            lineHeight: 1.6,
-          }}
-        >
-          {message.content}
-        </Typography>
+        {isUser ? (
+          <Typography
+            variant="body2"
+            sx={{
+              whiteSpace: "pre-wrap",
+              wordBreak: "break-word",
+              lineHeight: 1.6,
+            }}
+          >
+            {message.content}
+          </Typography>
+        ) : (
+          <Box
+            sx={(theme) => ({
+              fontSize: 14,
+              lineHeight: 1.6,
+              wordBreak: "break-word",
+              "& p": { margin: 0 },
+              "& p + p": { mt: 1.5 },
+              "& code": {
+                backgroundColor: theme.vars?.palette.level2,
+                borderRadius: 1,
+                px: 0.5,
+                py: 0.25,
+                fontSize: "0.85em",
+                fontFamily: "monospace",
+              },
+              "& pre": {
+                backgroundColor: theme.vars?.palette.level2,
+                borderRadius: 2,
+                p: 1.5,
+                overflow: "auto",
+                my: 1,
+                "& code": {
+                  backgroundColor: "transparent",
+                  p: 0,
+                },
+              },
+              "& ul, & ol": { pl: 2.5, my: 0.5 },
+              "& li": { mb: 0.25 },
+              "& a": { color: theme.vars?.palette.blue },
+              "& blockquote": {
+                borderLeft: `3px solid ${theme.vars?.palette.level3}`,
+                pl: 1.5,
+                my: 1,
+                opacity: 0.85,
+              },
+              "& table": {
+                borderCollapse: "collapse",
+                my: 1,
+                "& th, & td": {
+                  border: `1px solid ${theme.vars?.palette.level3}`,
+                  px: 1,
+                  py: 0.5,
+                  fontSize: 13,
+                },
+              },
+            })}
+          >
+            <Markdown remarkPlugins={[remarkGfm]}>{message.content}</Markdown>
+          </Box>
+        )}
         {message.model && (
           <Typography
             variant="caption"

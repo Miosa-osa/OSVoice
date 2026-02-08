@@ -52,23 +52,23 @@ export const QuickBarOverlayRoot = () => {
       <Box
         sx={{
           width: "100%",
-          height: "48px",
+          height: "36px",
           backgroundColor: "rgba(30, 30, 30, 0.85)",
           backdropFilter: "blur(20px)",
-          borderRadius: "28px",
+          borderRadius: "18px",
           border: "1px solid rgba(255, 255, 255, 0.12)",
           boxShadow: "0 4px 24px rgba(0, 0, 0, 0.3)",
           display: "flex",
           alignItems: "center",
-          paddingLeft: "16px",
-          paddingRight: "8px",
-          gap: "12px",
+          paddingLeft: "12px",
+          paddingRight: "6px",
+          gap: "8px",
         }}
       >
         <AutoAwesomeOutlined
           sx={{
             color: "rgba(255, 255, 255, 0.6)",
-            fontSize: "20px",
+            fontSize: "16px",
           }}
         />
         <InputBase
@@ -82,7 +82,7 @@ export const QuickBarOverlayRoot = () => {
           fullWidth
           sx={{
             color: "#FFFFFF",
-            fontSize: "15px",
+            fontSize: "13px",
             fontWeight: 400,
             "& input::placeholder": {
               color: "rgba(255, 255, 255, 0.5)",
@@ -95,8 +95,8 @@ export const QuickBarOverlayRoot = () => {
             onClick={handleSend}
             size="small"
             sx={{
-              width: "32px",
-              height: "32px",
+              width: "26px",
+              height: "26px",
               backgroundColor: "rgba(255, 255, 255, 0.12)",
               color: "#FFFFFF",
               "&:hover": {
@@ -104,7 +104,7 @@ export const QuickBarOverlayRoot = () => {
               },
             }}
           >
-            <ArrowUpward sx={{ fontSize: "16px" }} />
+            <ArrowUpward sx={{ fontSize: "14px" }} />
           </IconButton>
         )}
       </Box>

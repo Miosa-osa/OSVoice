@@ -1,17 +1,32 @@
-import { SendRounded } from "@mui/icons-material";
-import { Box, IconButton, TextField } from "@mui/material";
+import { MicRounded, SendRounded, StopRounded } from "@mui/icons-material";
+import { Box, CircularProgress, IconButton, TextField } from "@mui/material";
+import { invoke } from "@tauri-apps/api/core";
 import { useCallback, useRef, useState } from "react";
 import { useIntl } from "react-intl";
+import { createTranscriptionSession } from "../../sessions";
+import { getAppState } from "../../store";
+import type {
+  StopRecordingResponse,
+  TranscriptionSession,
+} from "../../types/transcription-session.types";
+import {
+  getMyPreferredMicrophone,
+  getTranscriptionPrefs,
+} from "../../utils/user.utils";
 
 type ChatInputProps = {
   onSend: (content: string) => void;
   disabled?: boolean;
 };
 
+type RecordingState = "idle" | "recording" | "transcribing";
+
 export const ChatInput = ({ onSend, disabled }: ChatInputProps) => {
   const intl = useIntl();
   const [value, setValue] = useState("");
+  const [recordingState, setRecordingState] = useState<RecordingState>("idle");
   const inputRef = useRef<HTMLInputElement>(null);
+  const sessionRef = useRef<TranscriptionSession | null>(null);
 
   const handleSend = useCallback(() => {
     const trimmed = value.trim();
@@ -31,6 +46,67 @@ export const ChatInput = ({ onSend, disabled }: ChatInputProps) => {
     [handleSend],
   );
 
+  const handleStartRecording = useCallback(async () => {
+    try {
+      const state = getAppState();
+      const prefs = getTranscriptionPrefs(state);
+      const preferredMic = getMyPreferredMicrophone(state);
+
+      sessionRef.current = createTranscriptionSession(prefs);
+
+      const startResp = await invoke<{ sampleRate: number }>(
+        "start_recording",
+        { args: { preferredMicrophone: preferredMic } },
+      );
+
+      await sessionRef.current.onRecordingStart(startResp.sampleRate);
+      setRecordingState("recording");
+    } catch (error) {
+      console.error("Failed to start voice recording for chat", error);
+      sessionRef.current?.cleanup();
+      sessionRef.current = null;
+      setRecordingState("idle");
+    }
+  }, []);
+
+  const handleStopRecording = useCallback(async () => {
+    setRecordingState("transcribing");
+    try {
+      const audio = await invoke<StopRecordingResponse>("stop_recording");
+      const session = sessionRef.current;
+
+      if (session) {
+        const result = await session.finalize(audio);
+        session.cleanup();
+        sessionRef.current = null;
+
+        if (result.rawTranscript) {
+          const current = value.trim();
+          const transcript = result.rawTranscript.trim();
+          const combined = current ? `${current} ${transcript}` : transcript;
+          setValue(combined);
+          inputRef.current?.focus();
+        }
+      }
+    } catch (error) {
+      console.error("Failed to stop voice recording for chat", error);
+      sessionRef.current?.cleanup();
+      sessionRef.current = null;
+    }
+    setRecordingState("idle");
+  }, [value]);
+
+  const handleMicClick = useCallback(() => {
+    if (recordingState === "recording") {
+      void handleStopRecording();
+    } else if (recordingState === "idle") {
+      void handleStartRecording();
+    }
+  }, [recordingState, handleStartRecording, handleStopRecording]);
+
+  const isRecording = recordingState === "recording";
+  const isTranscribing = recordingState === "transcribing";
+
   return (
     <Box
       sx={(theme) => ({
@@ -45,25 +121,48 @@ export const ChatInput = ({ onSend, disabled }: ChatInputProps) => {
           display: "flex",
           alignItems: "flex-end",
           gap: 1,
-          backgroundColor: theme.vars?.palette.level1,
+          backgroundColor: isRecording
+            ? theme.vars?.palette.level2
+            : theme.vars?.palette.level1,
           borderRadius: 3,
           px: 2,
           py: 1,
+          transition: "background-color 0.2s ease",
         })}
       >
+        <IconButton
+          onClick={handleMicClick}
+          disabled={disabled || isTranscribing}
+          size="small"
+          sx={(theme) => ({
+            color: isRecording ? "#ef4444" : theme.vars?.palette.text.secondary,
+          })}
+        >
+          {isTranscribing ? (
+            <CircularProgress size={20} />
+          ) : isRecording ? (
+            <StopRounded />
+          ) : (
+            <MicRounded />
+          )}
+        </IconButton>
         <TextField
           inputRef={inputRef}
           value={value}
           onChange={(e) => setValue(e.target.value)}
           onKeyDown={handleKeyDown}
-          placeholder={intl.formatMessage({
-            defaultMessage: "Ask OSVoice anything...",
-          })}
+          placeholder={
+            isRecording
+              ? intl.formatMessage({ defaultMessage: "Listening..." })
+              : intl.formatMessage({
+                  defaultMessage: "Ask OSVoice anything...",
+                })
+          }
           multiline
           maxRows={6}
           fullWidth
           variant="standard"
-          disabled={disabled}
+          disabled={disabled || isRecording}
           slotProps={{
             input: {
               disableUnderline: true,
@@ -73,7 +172,7 @@ export const ChatInput = ({ onSend, disabled }: ChatInputProps) => {
         />
         <IconButton
           onClick={handleSend}
-          disabled={!value.trim() || disabled}
+          disabled={!value.trim() || disabled || isRecording}
           size="small"
           sx={(theme) => ({
             color: value.trim()

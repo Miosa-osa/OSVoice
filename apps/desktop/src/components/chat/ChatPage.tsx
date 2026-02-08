@@ -4,12 +4,14 @@ import { FormattedMessage } from "react-intl";
 import { produceAppState, useAppStore } from "../../store";
 import {
   loadConversationMessages,
+  loadConversations,
   sendChatMessage,
   createNewConversation,
 } from "../../actions/chat.actions";
 import { ChatInput } from "./ChatInput";
 import { ChatMessageList } from "./ChatMessageList";
 import { ChatEmptyState } from "./ChatEmptyState";
+import { ChatConversationList } from "./ChatConversationList";
 
 export default function ChatPage() {
   const activeConversationId = useAppStore(
@@ -19,6 +21,14 @@ export default function ChatPage() {
   const isStreaming = useAppStore((state) => state.chat.isStreaming);
   const pendingQuery = useAppStore((state) => state.chat.pendingQuickBarQuery);
   const pendingHandled = useRef(false);
+  const conversationsLoaded = useRef(false);
+
+  useEffect(() => {
+    if (!conversationsLoaded.current) {
+      conversationsLoaded.current = true;
+      void loadConversations();
+    }
+  }, []);
 
   useEffect(() => {
     if (activeConversationId) {
@@ -39,6 +49,13 @@ export default function ChatPage() {
     },
     [activeConversationId],
   );
+
+  const handleNewConversation = useCallback(() => {
+    produceAppState((draft) => {
+      draft.chat.activeConversationId = null;
+      draft.chat.messageIds = [];
+    });
+  }, []);
 
   useEffect(() => {
     if (pendingQuery && !pendingHandled.current) {
@@ -76,16 +93,35 @@ export default function ChatPage() {
           flex: 1,
           overflow: "hidden",
           display: "flex",
-          flexDirection: "column",
+          flexDirection: "row",
         }}
       >
-        {messageIds.length === 0 && !isStreaming ? (
-          <ChatEmptyState />
-        ) : (
-          <ChatMessageList />
-        )}
+        <ChatConversationList onNewConversation={handleNewConversation} />
+        <Box
+          sx={{
+            flex: 1,
+            display: "flex",
+            flexDirection: "column",
+            overflow: "hidden",
+          }}
+        >
+          <Box
+            sx={{
+              flex: 1,
+              overflow: "hidden",
+              display: "flex",
+              flexDirection: "column",
+            }}
+          >
+            {messageIds.length === 0 && !isStreaming ? (
+              <ChatEmptyState />
+            ) : (
+              <ChatMessageList />
+            )}
+          </Box>
+          <ChatInput onSend={handleSend} disabled={isStreaming} />
+        </Box>
       </Box>
-      <ChatInput onSend={handleSend} disabled={isStreaming} />
     </Stack>
   );
 }

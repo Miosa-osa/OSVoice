@@ -25,8 +25,8 @@ pub const AGENT_OVERLAY_LEFT_OFFSET: f64 = 16.0;
 pub const AGENT_OVERLAY_TOP_OFFSET: f64 = 16.0;
 
 pub const QUICK_BAR_OVERLAY_LABEL: &str = "quick-bar-overlay";
-pub const QUICK_BAR_OVERLAY_WIDTH: f64 = 480.0;
-pub const QUICK_BAR_OVERLAY_HEIGHT: f64 = 56.0;
+pub const QUICK_BAR_OVERLAY_WIDTH: f64 = 320.0;
+pub const QUICK_BAR_OVERLAY_HEIGHT: f64 = 44.0;
 
 const CURSOR_POLL_INTERVAL_MS: u64 = 60;
 const DEFAULT_SCREEN_WIDTH: f64 = 1920.0;
@@ -230,11 +230,7 @@ pub fn ensure_quick_bar_overlay_window(app: &tauri::AppHandle) -> tauri::Result<
         }
     };
 
-    let window = builder.build()?;
-
-    if let Err(err) = crate::platform::window::configure_overlay_non_activating(&window) {
-        eprintln!("Failed to configure {QUICK_BAR_OVERLAY_LABEL} as non-activating: {err}");
-    }
+    builder.build()?;
 
     Ok(())
 }
