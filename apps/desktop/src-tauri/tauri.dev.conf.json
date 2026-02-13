@@ -1,0 +1,12 @@
+{
+  "productName": "OS Voice (dev)",
+  "identifier": "com.osvoice.desktop.dev",
+  "mainBinaryName": "OS Voice (dev)",
+  "plugins": {
+    "updater": {
+      "endpoints": [
+        ""
+      ]
+    }
+  }
+}

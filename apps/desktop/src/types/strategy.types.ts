@@ -1,0 +1,38 @@
+import type { AppTarget, Nullable } from "@repo/types";
+import type { RefObject } from "react";
+import type {
+  PostProcessMetadata,
+  TranscribeAudioMetadata,
+} from "../actions/transcribe.actions";
+import type { TextFieldInfo } from "./accessibility.types";
+import type { ToastAction } from "./toast.types";
+import type { StopRecordingResponse } from "./transcription-session.types";
+
+export type StrategyValidationError = {
+  title: string;
+  body: string;
+  action: Nullable<ToastAction>;
+};
+
+export type HandleTranscriptParams = {
+  rawTranscript: string;
+  toneId: string | null;
+  a11yInfo: TextFieldInfo | null;
+  currentApp: AppTarget | null;
+  loadingToken: symbol | null;
+  audio: StopRecordingResponse;
+  transcriptionMetadata: TranscribeAudioMetadata;
+  transcriptionWarnings: string[];
+};
+
+export type HandleTranscriptResult = {
+  shouldContinue: boolean;
+  transcript: string | null;
+  sanitizedTranscript: string | null;
+  postProcessMetadata: PostProcessMetadata;
+  postProcessWarnings: string[];
+};
+
+export type StrategyContext = {
+  overlayLoadingTokenRef: RefObject<symbol | null>;
+};

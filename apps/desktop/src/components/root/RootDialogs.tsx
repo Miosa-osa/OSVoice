@@ -1,0 +1,39 @@
+import { StatsDialog } from "../home/StatsDialog";
+import { PaymentDialog } from "../payment/PaymentDialog";
+import { AIAgentModeDialog } from "../settings/AIAgentModeDialog";
+import { AIPostProcessingDialog } from "../settings/AIPostProcessingDialog";
+import { AITranscriptionDialog } from "../settings/AITranscriptionDialog";
+import { AudioDialog } from "../settings/AudioDialog";
+import { ClearLocalDataDialog } from "../settings/ClearLocalDataDialog";
+import { MicrophoneDialog } from "../settings/MicrophoneDialog";
+import { MoreSettingsDialog } from "../settings/MoreSettingsDialog";
+import { ProfileDialog } from "../settings/ProfileDialog";
+import { ShortcutsDialog } from "../settings/ShortcutsDialog";
+import { VibeCodingDialog } from "../settings/VibeCodingDialog";
+import { UpgradePlanDialog } from "../pricing/UpgradePlanDialog";
+import { UpdateDialog } from "./UpdateDialog";
+import { DeleteAccountDialog } from "../settings/DeleteAccountDialog";
+import { ToneEditorDialog } from "../tones/ToneEditorDialog";
+
+export const RootDialogs = () => {
+  return (
+    <>
+      <UpdateDialog />
+      <StatsDialog />
+      <ToneEditorDialog />
+      <AITranscriptionDialog />
+      <AIPostProcessingDialog />
+      <AIAgentModeDialog />
+      <ProfileDialog />
+      <MicrophoneDialog />
+      <AudioDialog />
+      <ShortcutsDialog />
+      <VibeCodingDialog />
+      <ClearLocalDataDialog />
+      <UpgradePlanDialog />
+      <PaymentDialog />
+      <DeleteAccountDialog />
+      <MoreSettingsDialog />
+    </>
+  );
+};

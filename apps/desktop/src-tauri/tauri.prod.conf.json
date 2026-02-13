@@ -1,0 +1,19 @@
+{
+  "productName": "OS Voice",
+  "identifier": "com.osvoice.desktop",
+  "mainBinaryName": "OS Voice",
+  "bundle": {
+    "linux": {
+      "deb": {
+        "depends": ["libxdo3"]
+      }
+    }
+  },
+  "plugins": {
+    "updater": {
+      "endpoints": [
+        ""
+      ]
+    }
+  }
+}
