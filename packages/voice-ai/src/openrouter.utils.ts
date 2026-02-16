@@ -7,6 +7,7 @@ import type {
   OpenRouterProvider,
   OpenRouterProviderRouting,
 } from "@repo/types";
+import { buildChatMessages, accumulateStream } from "./openai-compat.utils";
 
 export const OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1";
 export const OPENROUTER_APP_NAME = "OSVoice";
@@ -239,13 +240,7 @@ export const openrouterGenerateChatResponse = async ({
     fn: async () => {
       const client = createClient(apiKey, customFetch);
 
-      const chatMessages: OpenAI.Chat.ChatCompletionMessageParam[] = [];
-      if (system) {
-        chatMessages.push({ role: "system", content: system });
-      }
-      for (const msg of messages) {
-        chatMessages.push({ role: msg.role, content: msg.content });
-      }
+      const chatMessages = buildChatMessages({ system, messages });
 
       const requestParams: OpenAI.Chat.ChatCompletionCreateParamsNonStreaming & {
         provider?: OpenRouterProviderRouting;
@@ -279,6 +274,65 @@ export const openrouterGenerateChatResponse = async ({
       };
     },
   });
+};
+
+// ============================================================================
+// Stream Chat
+// ============================================================================
+
+export type OpenRouterStreamChatArgs = {
+  apiKey: string;
+  model?: string;
+  system?: string;
+  messages: { role: "user" | "assistant"; content: string }[];
+  onChunk: (delta: string) => void;
+  providerRouting?: OpenRouterProviderRouting;
+  customFetch?: typeof globalThis.fetch;
+};
+
+export const openrouterStreamChatResponse = async ({
+  apiKey,
+  model = OPENROUTER_DEFAULT_MODEL,
+  system,
+  messages,
+  onChunk,
+  providerRouting,
+  customFetch,
+}: OpenRouterStreamChatArgs): Promise<OpenRouterGenerateTextOutput> => {
+  const client = createClient(apiKey, customFetch);
+
+  const chatMessages = buildChatMessages({ system, messages });
+
+  const requestParams: OpenAI.Chat.ChatCompletionCreateParamsStreaming & {
+    provider?: OpenRouterProviderRouting;
+  } = {
+    messages: chatMessages,
+    model,
+    temperature: 1,
+    max_tokens: 1024,
+    top_p: 1,
+    stream: true,
+  };
+
+  if (providerRouting) {
+    requestParams.provider = providerRouting;
+  }
+
+  const stream = await client.chat.completions.create(requestParams);
+
+  const { fullContent, tokensUsed } = await accumulateStream({
+    stream,
+    onChunk,
+  });
+
+  if (!fullContent) {
+    throw new Error("No response from OpenRouter");
+  }
+
+  return {
+    text: fullContent,
+    tokensUsed: tokensUsed || countWords(fullContent),
+  };
 };
 
 // ============================================================================

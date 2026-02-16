@@ -3,6 +3,7 @@ import type { ChatCompletionMessageParam } from "openai/resources/chat/completio
 import { retry } from "@repo/utilities/src/async";
 import { countWords } from "@repo/utilities/src/string";
 import type { JsonResponse } from "@repo/types";
+import { buildChatMessages, accumulateStream } from "./openai-compat.utils";
 
 export const AZURE_OPENAI_MODELS = [
   "gpt-5-mini",
@@ -103,13 +104,7 @@ export const azureOpenAIGenerateChat = async ({
     fn: async () => {
       const client = createClient(apiKey, endpoint);
 
-      const chatMessages: ChatCompletionMessageParam[] = [];
-      if (system) {
-        chatMessages.push({ role: "system", content: system });
-      }
-      for (const msg of messages) {
-        chatMessages.push({ role: msg.role, content: msg.content });
-      }
+      const chatMessages = buildChatMessages({ system, messages });
 
       const response = await client.chat.completions.create({
         messages: chatMessages,
@@ -125,6 +120,51 @@ export const azureOpenAIGenerateChat = async ({
       };
     },
   });
+};
+
+export type AzureOpenAIStreamChatArgs = {
+  apiKey: string;
+  endpoint: string;
+  deploymentName: string;
+  system?: string;
+  messages: { role: "user" | "assistant"; content: string }[];
+  onChunk: (delta: string) => void;
+};
+
+export const azureOpenAIStreamChat = async ({
+  apiKey,
+  endpoint,
+  deploymentName,
+  system,
+  messages,
+  onChunk,
+}: AzureOpenAIStreamChatArgs): Promise<AzureOpenAIGenerateResponseOutput> => {
+  const client = createClient(apiKey, endpoint);
+
+  const chatMessages = buildChatMessages({ system, messages });
+
+  const stream = await client.chat.completions.create({
+    messages: chatMessages,
+    model: deploymentName,
+    temperature: 1,
+    max_completion_tokens: 1024,
+    stream: true,
+    stream_options: { include_usage: true },
+  });
+
+  const { fullContent, tokensUsed } = await accumulateStream({
+    stream,
+    onChunk,
+  });
+
+  if (!fullContent) {
+    throw new Error("No response from Azure OpenAI");
+  }
+
+  return {
+    text: fullContent,
+    tokensUsed: tokensUsed || countWords(fullContent),
+  };
 };
 
 export type AzureOpenAITestIntegrationArgs = {
