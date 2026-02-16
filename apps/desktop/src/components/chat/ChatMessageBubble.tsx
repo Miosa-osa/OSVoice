@@ -1,4 +1,4 @@
-import { Box, Typography } from "@mui/material";
+import { Box, keyframes, Typography } from "@mui/material";
 import { memo } from "react";
 import Markdown from "react-markdown";
 import rehypeSanitize from "rehype-sanitize";
@@ -12,9 +12,17 @@ type ChatMessageBubbleProps = {
 const REMARK_PLUGINS = [remarkGfm];
 const REHYPE_PLUGINS = [rehypeSanitize];
 
+const blink = keyframes`
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+`;
+
 export const ChatMessageBubble = memo(
   ({ messageId }: ChatMessageBubbleProps) => {
     const message = useAppStore((state) => state.messageById[messageId]);
+    const isStreamingThis = useAppStore(
+      (state) => state.chat.streamingMessageId === messageId,
+    );
 
     if (!message) return null;
 
@@ -106,11 +114,25 @@ export const ChatMessageBubble = memo(
                 remarkPlugins={REMARK_PLUGINS}
                 rehypePlugins={REHYPE_PLUGINS}
               >
-                {message.content}
+                {message.content || "\u00A0"}
               </Markdown>
+              {isStreamingThis && (
+                <Box
+                  component="span"
+                  sx={(theme) => ({
+                    display: "inline-block",
+                    width: 2,
+                    height: "1em",
+                    backgroundColor: theme.vars?.palette.text.primary,
+                    ml: 0.25,
+                    verticalAlign: "text-bottom",
+                    animation: `${blink} 1s step-end infinite`,
+                  })}
+                />
+              )}
             </Box>
           )}
-          {message.model && (
+          {message.model && !isStreamingThis && (
             <Typography
               variant="caption"
               sx={{

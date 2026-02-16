@@ -9,6 +9,8 @@ const MAX_MESSAGE_LENGTH = 10000;
 const MAX_TITLE_LENGTH = 60;
 const CONTEXT_WINDOW_SIZE = 20;
 
+let activeStreamAbortController: AbortController | null = null;
+
 export const createNewConversation = async (): Promise<string | null> => {
   const now = dayjs().toISOString();
   const conversation: Conversation = {
@@ -91,11 +93,19 @@ export const setActiveConversation = async (
   }
 };
 
+export const stopChatStream = (): void => {
+  if (activeStreamAbortController) {
+    activeStreamAbortController.abort();
+    activeStreamAbortController = null;
+  }
+};
+
 export const sendChatMessage = async (
   conversationId: string,
   content: string,
 ): Promise<void> => {
-  if (getAppState().chat.isLoading) return;
+  const { chat } = getAppState();
+  if (chat.isLoading || chat.isStreaming) return;
 
   const trimmed = content.slice(0, MAX_MESSAGE_LENGTH);
 
@@ -107,10 +117,27 @@ export const sendChatMessage = async (
     createdAt: dayjs().toISOString(),
   };
 
+  const assistantMessageId = createId();
+  const assistantMessage: Message = {
+    id: assistantMessageId,
+    conversationId,
+    role: "assistant",
+    content: "",
+    createdAt: dayjs().toISOString(),
+  };
+
+  let rafHandle: number | null = null;
+
   produceAppState((draft) => {
     draft.messageById[userMessage.id] = userMessage;
-    draft.chat.messageIds = [...draft.chat.messageIds, userMessage.id];
+    draft.messageById[assistantMessageId] = assistantMessage;
+    draft.chat.messageIds = [
+      ...draft.chat.messageIds,
+      userMessage.id,
+      assistantMessageId,
+    ];
     draft.chat.isLoading = true;
+    draft.chat.streamingMessageId = assistantMessageId;
   });
 
   try {
@@ -127,11 +154,14 @@ export const sendChatMessage = async (
 
     const state = getAppState();
     const chatMessages: ChatMessage[] = state.chat.messageIds
+      .slice(0, -1)
       .slice(-CONTEXT_WINDOW_SIZE)
       .map((id) => state.messageById[id])
       .filter(
         (m): m is Message =>
-          !!m && (m.role === "user" || m.role === "assistant"),
+          !!m &&
+          (m.role === "user" || m.role === "assistant") &&
+          m.content !== "",
       )
       .map((m) => ({
         role: m.role as "user" | "assistant",
@@ -141,27 +171,67 @@ export const sendChatMessage = async (
     const systemPrompt =
       "You are OSVoice, a helpful AI assistant. Be concise and clear.";
 
-    const result = await repo.generateChat({
-      system: systemPrompt,
-      messages: chatMessages,
-    });
+    activeStreamAbortController = new AbortController();
+    const { signal } = activeStreamAbortController;
 
-    const assistantMessage: Message = {
-      id: createId(),
-      conversationId,
-      role: "assistant",
-      content: result.text,
-      model: result.metadata?.inferenceDevice ?? undefined,
-      createdAt: dayjs().toISOString(),
+    let accumulated = "";
+    let firstChunk = true;
+
+    const flushToState = () => {
+      rafHandle = null;
+      const snapshot = accumulated;
+      produceAppState((draft) => {
+        const msg = draft.messageById[assistantMessageId];
+        if (msg) {
+          msg.content = snapshot;
+        }
+      });
     };
 
-    produceAppState((draft) => {
-      draft.messageById[assistantMessage.id] = assistantMessage;
-      draft.chat.messageIds = [...draft.chat.messageIds, assistantMessage.id];
-      draft.chat.isLoading = false;
+    const result = await repo.generateChatStream({
+      system: systemPrompt,
+      messages: chatMessages,
+      onChunk: (delta: string) => {
+        if (signal.aborted) {
+          throw new DOMException("Aborted", "AbortError");
+        }
+        if (firstChunk) {
+          firstChunk = false;
+          produceAppState((draft) => {
+            draft.chat.isLoading = false;
+            draft.chat.isStreaming = true;
+          });
+        }
+        accumulated += delta;
+        if (rafHandle === null) {
+          rafHandle = requestAnimationFrame(flushToState);
+        }
+      },
     });
 
-    await getConversationRepo().createMessage(assistantMessage);
+    activeStreamAbortController = null;
+
+    if (rafHandle !== null) {
+      cancelAnimationFrame(rafHandle);
+      rafHandle = null;
+    }
+
+    produceAppState((draft) => {
+      const msg = draft.messageById[assistantMessageId];
+      if (msg) {
+        msg.content = result.text;
+        msg.model = result.metadata?.inferenceDevice ?? undefined;
+      }
+      draft.chat.isLoading = false;
+      draft.chat.isStreaming = false;
+      draft.chat.streamingMessageId = null;
+    });
+
+    await getConversationRepo().createMessage({
+      ...assistantMessage,
+      content: result.text,
+      model: result.metadata?.inferenceDevice ?? undefined,
+    });
 
     const conversation = getAppState().conversationById[conversationId];
     if (conversation && !conversation.title) {
@@ -180,10 +250,32 @@ export const sendChatMessage = async (
       await getConversationRepo().updateConversation(updated);
     }
   } catch (error) {
+    activeStreamAbortController = null;
+    if (rafHandle !== null) {
+      cancelAnimationFrame(rafHandle);
+      rafHandle = null;
+    }
+    const isAbort =
+      error instanceof DOMException && error.name === "AbortError";
+
     produceAppState((draft) => {
       draft.chat.isLoading = false;
+      draft.chat.isStreaming = false;
+      draft.chat.streamingMessageId = null;
+      if (!isAbort) {
+        const msg = draft.messageById[assistantMessageId];
+        if (msg && !msg.content) {
+          delete draft.messageById[assistantMessageId];
+          draft.chat.messageIds = draft.chat.messageIds.filter(
+            (id) => id !== assistantMessageId,
+          );
+        }
+      }
     });
-    showErrorSnackbar(error);
+
+    if (!isAbort) {
+      showErrorSnackbar(error);
+    }
   }
 };
 

@@ -44,6 +44,7 @@ const TypingIndicator = () => (
 export const ChatMessageList = () => {
   const messageIds = useAppStore((state) => state.chat.messageIds);
   const isLoading = useAppStore((state) => state.chat.isLoading);
+  const isStreaming = useAppStore((state) => state.chat.isStreaming);
   const virtuosoRef = useRef<VirtuosoHandle>(null);
 
   useEffect(() => {
@@ -54,7 +55,7 @@ export const ChatMessageList = () => {
         align: "end",
       });
     }
-  }, [messageIds.length, isLoading]);
+  }, [messageIds.length]);
 
   return (
     <Box
@@ -76,7 +77,7 @@ export const ChatMessageList = () => {
         )}
         style={{ flex: 1 }}
       />
-      {isLoading && (
+      {isLoading && !isStreaming && (
         <Box sx={{ px: 3, py: 1 }}>
           <TypingIndicator />
         </Box>

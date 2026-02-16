@@ -7,6 +7,7 @@ import {
   loadConversations,
   sendChatMessage,
   createNewConversation,
+  stopChatStream,
 } from "../../actions/chat.actions";
 import { ChatInput } from "./ChatInput";
 import { ChatMessageList } from "./ChatMessageList";
@@ -19,6 +20,7 @@ export default function ChatPage() {
   );
   const messageIds = useAppStore((state) => state.chat.messageIds);
   const isLoading = useAppStore((state) => state.chat.isLoading);
+  const isStreaming = useAppStore((state) => state.chat.isStreaming);
   const pendingQuery = useAppStore((state) => state.chat.pendingQuickBarQuery);
   const pendingHandled = useRef(false);
 
@@ -109,13 +111,18 @@ export default function ChatPage() {
               flexDirection: "column",
             }}
           >
-            {messageIds.length === 0 && !isLoading ? (
+            {messageIds.length === 0 && !isLoading && !isStreaming ? (
               <ChatEmptyState />
             ) : (
               <ChatMessageList />
             )}
           </Box>
-          <ChatInput onSend={handleSend} disabled={isLoading} />
+          <ChatInput
+            onSend={handleSend}
+            disabled={isLoading || isStreaming}
+            isStreaming={isStreaming}
+            onStop={stopChatStream}
+          />
         </Box>
       </Box>
     </Stack>

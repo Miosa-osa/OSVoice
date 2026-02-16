@@ -7,9 +7,16 @@ import { useVoiceRecording } from "../../hooks/voice-recording.hooks";
 type ChatInputProps = {
   onSend: (content: string) => void;
   disabled?: boolean;
+  isStreaming?: boolean;
+  onStop?: () => void;
 };
 
-export const ChatInput = ({ onSend, disabled }: ChatInputProps) => {
+export const ChatInput = ({
+  onSend,
+  disabled,
+  isStreaming,
+  onStop,
+}: ChatInputProps) => {
   const intl = useIntl();
   const [value, setValue] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
@@ -114,19 +121,34 @@ export const ChatInput = ({ onSend, disabled }: ChatInputProps) => {
             },
           }}
         />
-        <IconButton
-          onClick={handleSend}
-          disabled={!value.trim() || disabled || isRecording}
-          size="small"
-          aria-label={intl.formatMessage({ defaultMessage: "Send message" })}
-          sx={(theme) => ({
-            color: value.trim()
-              ? theme.vars?.palette.blue
-              : theme.vars?.palette.text.secondary,
-          })}
-        >
-          <SendRounded />
-        </IconButton>
+        {isStreaming ? (
+          <IconButton
+            onClick={onStop}
+            size="small"
+            aria-label={intl.formatMessage({
+              defaultMessage: "Stop generating",
+            })}
+            sx={{ color: "#ef4444" }}
+          >
+            <StopRounded />
+          </IconButton>
+        ) : (
+          <IconButton
+            onClick={handleSend}
+            disabled={!value.trim() || disabled || isRecording}
+            size="small"
+            aria-label={intl.formatMessage({
+              defaultMessage: "Send message",
+            })}
+            sx={(theme) => ({
+              color: value.trim()
+                ? theme.vars?.palette.blue
+                : theme.vars?.palette.text.secondary,
+            })}
+          >
+            <SendRounded />
+          </IconButton>
+        )}
       </Box>
     </Box>
   );
