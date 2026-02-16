@@ -17,7 +17,6 @@ use whisper_rs::vulkan;
 ))]
 const DISABLE_ENV: &str = "OSVOICE_WHISPER_DISABLE_GPU";
 
-// Practical limit: auto + CPU + 2 GPU devices. Each context is ~150-400MB depending on model.
 const MAX_CONTEXT_CACHE_ENTRIES: usize = 4;
 
 pub struct WhisperTranscriber {
