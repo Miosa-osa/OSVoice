@@ -1,9 +1,13 @@
-import { Conversation, Message } from "@repo/types";
+import type { ChatMessage, Conversation, Message } from "@repo/types";
 import dayjs from "dayjs";
 import { getAppState, produceAppState } from "../store";
 import { createId } from "../utils/id.utils";
 import { getConversationRepo, getGenerateTextRepo } from "../repos";
 import { showErrorSnackbar } from "./app.actions";
+
+const MAX_MESSAGE_LENGTH = 10000;
+const MAX_TITLE_LENGTH = 60;
+const CONTEXT_WINDOW_SIZE = 20;
 
 export const createNewConversation = async (): Promise<string | null> => {
   const now = dayjs().toISOString();
@@ -76,6 +80,9 @@ export const setActiveConversation = async (
   conversationId: string | null,
 ): Promise<void> => {
   produceAppState((draft) => {
+    for (const mId of draft.chat.messageIds) {
+      delete draft.messageById[mId];
+    }
     draft.chat.activeConversationId = conversationId;
     draft.chat.messageIds = [];
   });
@@ -88,19 +95,22 @@ export const sendChatMessage = async (
   conversationId: string,
   content: string,
 ): Promise<void> => {
+  if (getAppState().chat.isLoading) return;
+
+  const trimmed = content.slice(0, MAX_MESSAGE_LENGTH);
+
   const userMessage: Message = {
     id: createId(),
     conversationId,
     role: "user",
-    content,
+    content: trimmed,
     createdAt: dayjs().toISOString(),
   };
 
   produceAppState((draft) => {
     draft.messageById[userMessage.id] = userMessage;
     draft.chat.messageIds = [...draft.chat.messageIds, userMessage.id];
-    draft.chat.isStreaming = true;
-    draft.chat.streamingContent = "";
+    draft.chat.isLoading = true;
   });
 
   try {
@@ -116,23 +126,24 @@ export const sendChatMessage = async (
     }
 
     const state = getAppState();
-    const conversationMessages = state.chat.messageIds
+    const chatMessages: ChatMessage[] = state.chat.messageIds
+      .slice(-CONTEXT_WINDOW_SIZE)
       .map((id) => state.messageById[id])
-      .filter(Boolean);
+      .filter(
+        (m): m is Message =>
+          !!m && (m.role === "user" || m.role === "assistant"),
+      )
+      .map((m) => ({
+        role: m.role as "user" | "assistant",
+        content: m.content,
+      }));
 
     const systemPrompt =
       "You are OSVoice, a helpful AI assistant. Be concise and clear.";
 
-    const contextMessages = conversationMessages
-      .slice(-20)
-      .map((m) => `${m.role === "user" ? "User" : "Assistant"}: ${m.content}`)
-      .join("\n\n");
-
-    const prompt = contextMessages;
-
-    const result = await repo.generateText({
+    const result = await repo.generateChat({
       system: systemPrompt,
-      prompt,
+      messages: chatMessages,
     });
 
     const assistantMessage: Message = {
@@ -147,8 +158,7 @@ export const sendChatMessage = async (
     produceAppState((draft) => {
       draft.messageById[assistantMessage.id] = assistantMessage;
       draft.chat.messageIds = [...draft.chat.messageIds, assistantMessage.id];
-      draft.chat.isStreaming = false;
-      draft.chat.streamingContent = "";
+      draft.chat.isLoading = false;
     });
 
     await getConversationRepo().createMessage(assistantMessage);
@@ -156,7 +166,9 @@ export const sendChatMessage = async (
     const conversation = getAppState().conversationById[conversationId];
     if (conversation && !conversation.title) {
       const title =
-        content.length > 60 ? `${content.slice(0, 57)}...` : content;
+        trimmed.length > MAX_TITLE_LENGTH
+          ? `${trimmed.slice(0, MAX_TITLE_LENGTH - 3)}...`
+          : trimmed;
       const updated: Conversation = {
         ...conversation,
         title,
@@ -169,8 +181,7 @@ export const sendChatMessage = async (
     }
   } catch (error) {
     produceAppState((draft) => {
-      draft.chat.isStreaming = false;
-      draft.chat.streamingContent = "";
+      draft.chat.isLoading = false;
     });
     showErrorSnackbar(error);
   }
@@ -179,21 +190,47 @@ export const sendChatMessage = async (
 export const deleteConversation = async (id: string): Promise<void> => {
   const state = getAppState();
   const wasActive = state.chat.activeConversationId === id;
+  const prevConversation = state.conversationById[id];
+  const prevConversationIds = state.chat.conversationIds;
+  const prevMessageIds = wasActive ? state.chat.messageIds : [];
+  const prevMessages = wasActive
+    ? Object.fromEntries(
+        prevMessageIds
+          .map((mId) => [mId, state.messageById[mId]] as const)
+          .filter(([, m]) => !!m),
+      )
+    : {};
 
   produceAppState((draft) => {
+    if (wasActive) {
+      for (const mId of draft.chat.messageIds) {
+        delete draft.messageById[mId];
+      }
+      draft.chat.activeConversationId = null;
+      draft.chat.messageIds = [];
+    }
     delete draft.conversationById[id];
     draft.chat.conversationIds = draft.chat.conversationIds.filter(
       (cId) => cId !== id,
     );
-    if (wasActive) {
-      draft.chat.activeConversationId = null;
-      draft.chat.messageIds = [];
-    }
   });
 
   try {
     await getConversationRepo().deleteConversation(id);
   } catch (error) {
+    produceAppState((draft) => {
+      if (prevConversation) {
+        draft.conversationById[id] = prevConversation;
+      }
+      draft.chat.conversationIds = prevConversationIds;
+      if (wasActive) {
+        draft.chat.activeConversationId = id;
+        draft.chat.messageIds = prevMessageIds;
+        for (const [mId, msg] of Object.entries(prevMessages)) {
+          if (msg) draft.messageById[mId] = msg;
+        }
+      }
+    });
     showErrorSnackbar(error);
   }
 };

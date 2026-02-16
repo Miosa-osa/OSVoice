@@ -3,6 +3,7 @@ import { Box, CircularProgress, IconButton, TextField } from "@mui/material";
 import { invoke } from "@tauri-apps/api/core";
 import { useCallback, useRef, useState } from "react";
 import { useIntl } from "react-intl";
+import { showErrorSnackbar } from "../../actions/app.actions";
 import { createTranscriptionSession } from "../../sessions";
 import { getAppState } from "../../store";
 import type {
@@ -62,7 +63,7 @@ export const ChatInput = ({ onSend, disabled }: ChatInputProps) => {
       await sessionRef.current.onRecordingStart(startResp.sampleRate);
       setRecordingState("recording");
     } catch (error) {
-      console.error("Failed to start voice recording for chat", error);
+      showErrorSnackbar(error);
       sessionRef.current?.cleanup();
       sessionRef.current = null;
       setRecordingState("idle");
@@ -84,12 +85,12 @@ export const ChatInput = ({ onSend, disabled }: ChatInputProps) => {
           const current = value.trim();
           const transcript = result.rawTranscript.trim();
           const combined = current ? `${current} ${transcript}` : transcript;
-          setValue(combined);
+          setValue(combined.slice(0, 10000));
           inputRef.current?.focus();
         }
       }
     } catch (error) {
-      console.error("Failed to stop voice recording for chat", error);
+      showErrorSnackbar(error);
       sessionRef.current?.cleanup();
       sessionRef.current = null;
     }

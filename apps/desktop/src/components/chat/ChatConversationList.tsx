@@ -11,7 +11,7 @@ import {
   ListItemText,
   Typography,
 } from "@mui/material";
-import { useCallback } from "react";
+import { memo, useCallback } from "react";
 import { FormattedMessage } from "react-intl";
 import {
   deleteConversation,
@@ -104,53 +104,51 @@ type ConversationItemProps = {
   onDelete: (e: React.MouseEvent, id: string) => void;
 };
 
-const ConversationItem = ({
-  id,
-  isActive,
-  onSelect,
-  onDelete,
-}: ConversationItemProps) => {
-  const conversation = useAppStore((state) => state.conversationById[id]);
+const ConversationItem = memo(
+  ({ id, isActive, onSelect, onDelete }: ConversationItemProps) => {
+    const conversation = useAppStore((state) => state.conversationById[id]);
 
-  if (!conversation) return null;
+    if (!conversation) return null;
 
-  const title = conversation.title || "New conversation";
+    const title = conversation.title || "New conversation";
 
-  return (
-    <ListItemButton
-      selected={isActive}
-      onClick={() => onSelect(id)}
-      sx={(theme) => ({
-        borderRadius: 2,
-        py: 0.75,
-        px: 1,
-        mb: 0.25,
-        gap: 1,
-        "&.Mui-selected": {
-          backgroundColor: theme.vars?.palette.level2,
-        },
-        "& .delete-btn": { opacity: 0 },
-        "&:hover .delete-btn": { opacity: 1 },
-      })}
-    >
-      <ChatBubbleOutlineRounded
-        sx={{ fontSize: 14, opacity: 0.5, flexShrink: 0 }}
-      />
-      <ListItemText
-        primary={title}
-        primaryTypographyProps={{
-          noWrap: true,
-          sx: { fontSize: 13 },
-        }}
-      />
-      <IconButton
-        className="delete-btn"
-        size="small"
-        onClick={(e) => onDelete(e, id)}
-        sx={{ p: 0.25 }}
+    return (
+      <ListItemButton
+        selected={isActive}
+        onClick={() => onSelect(id)}
+        sx={(theme) => ({
+          borderRadius: 2,
+          py: 0.75,
+          px: 1,
+          mb: 0.25,
+          gap: 1,
+          "&.Mui-selected": {
+            backgroundColor: theme.vars?.palette.level2,
+          },
+          "& .delete-btn": { opacity: 0 },
+          "&:hover .delete-btn": { opacity: 1 },
+        })}
       >
-        <DeleteOutlineRounded sx={{ fontSize: 14 }} />
-      </IconButton>
-    </ListItemButton>
-  );
-};
+        <ChatBubbleOutlineRounded
+          sx={{ fontSize: 14, opacity: 0.5, flexShrink: 0 }}
+        />
+        <ListItemText
+          primary={title}
+          primaryTypographyProps={{
+            noWrap: true,
+            sx: { fontSize: 13 },
+          }}
+        />
+        <IconButton
+          className="delete-btn"
+          size="small"
+          aria-label="Delete conversation"
+          onClick={(e) => onDelete(e, id)}
+          sx={{ p: 0.25 }}
+        >
+          <DeleteOutlineRounded sx={{ fontSize: 14 }} />
+        </IconButton>
+      </ListItemButton>
+    );
+  },
+);

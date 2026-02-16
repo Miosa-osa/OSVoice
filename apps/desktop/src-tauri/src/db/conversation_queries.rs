@@ -40,15 +40,18 @@ pub async fn insert_conversation(
     Ok(conversation.clone())
 }
 
+const MAX_CONVERSATION_LIMIT: u32 = 200;
+
 pub async fn fetch_conversations(
     pool: SqlitePool,
     limit: u32,
     offset: u32,
 ) -> Result<Vec<Conversation>, sqlx::Error> {
+    let capped_limit = limit.min(MAX_CONVERSATION_LIMIT);
     let rows = sqlx::query(
         "SELECT id, title, created_at, updated_at FROM conversations ORDER BY updated_at DESC LIMIT ?1 OFFSET ?2",
     )
-    .bind(limit as i64)
+    .bind(capped_limit as i64)
     .bind(offset as i64)
     .fetch_all(&pool)
     .await?;
@@ -118,16 +121,4 @@ pub async fn fetch_messages(
     }
 
     Ok(messages)
-}
-
-pub async fn delete_messages_for_conversation(
-    pool: SqlitePool,
-    conversation_id: &str,
-) -> Result<(), sqlx::Error> {
-    sqlx::query("DELETE FROM messages WHERE conversation_id = ?1")
-        .bind(conversation_id)
-        .execute(&pool)
-        .await?;
-
-    Ok(())
 }

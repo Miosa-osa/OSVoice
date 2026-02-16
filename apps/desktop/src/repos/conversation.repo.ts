@@ -43,10 +43,14 @@ const toLocalMessage = (m: Message): LocalMessage => ({
   createdAt: m.createdAt,
 });
 
+const VALID_ROLES: Message["role"][] = ["user", "assistant", "system"];
+
 const fromLocalMessage = (m: LocalMessage): Message => ({
   id: m.id,
   conversationId: m.conversationId,
-  role: m.role as Message["role"],
+  role: VALID_ROLES.includes(m.role as Message["role"])
+    ? (m.role as Message["role"])
+    : "user",
   content: m.content,
   model: m.model ?? undefined,
   tokensUsed: m.tokensUsed ?? undefined,

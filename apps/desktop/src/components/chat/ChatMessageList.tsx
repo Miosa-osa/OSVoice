@@ -1,5 +1,6 @@
 import { Box, keyframes } from "@mui/material";
 import { useEffect, useRef } from "react";
+import { Virtuoso, type VirtuosoHandle } from "react-virtuoso";
 import { useAppStore } from "../../store";
 import { ChatMessageBubble } from "./ChatMessageBubble";
 
@@ -42,32 +43,44 @@ const TypingIndicator = () => (
 
 export const ChatMessageList = () => {
   const messageIds = useAppStore((state) => state.chat.messageIds);
-  const isStreaming = useAppStore((state) => state.chat.isStreaming);
-  const scrollRef = useRef<HTMLDivElement>(null);
+  const isLoading = useAppStore((state) => state.chat.isLoading);
+  const virtuosoRef = useRef<VirtuosoHandle>(null);
 
   useEffect(() => {
-    if (scrollRef.current) {
-      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+    if (virtuosoRef.current) {
+      virtuosoRef.current.scrollToIndex({
+        index: messageIds.length - 1,
+        behavior: "smooth",
+        align: "end",
+      });
     }
-  }, [messageIds, isStreaming]);
+  }, [messageIds.length, isLoading]);
 
   return (
     <Box
-      ref={scrollRef}
       sx={{
         flex: 1,
-        overflowY: "auto",
-        px: 3,
-        py: 2,
+        overflowY: "hidden",
         display: "flex",
         flexDirection: "column",
-        gap: 2,
       }}
     >
-      {messageIds.map((id) => (
-        <ChatMessageBubble key={id} messageId={id} />
-      ))}
-      {isStreaming && <TypingIndicator />}
+      <Virtuoso
+        ref={virtuosoRef}
+        data={messageIds}
+        followOutput="smooth"
+        itemContent={(_index, id) => (
+          <Box sx={{ px: 3, py: 1 }}>
+            <ChatMessageBubble messageId={id} />
+          </Box>
+        )}
+        style={{ flex: 1 }}
+      />
+      {isLoading && (
+        <Box sx={{ px: 3, py: 1 }}>
+          <TypingIndicator />
+        </Box>
+      )}
     </Box>
   );
 };

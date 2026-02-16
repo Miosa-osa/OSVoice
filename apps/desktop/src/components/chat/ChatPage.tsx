@@ -18,16 +18,12 @@ export default function ChatPage() {
     (state) => state.chat.activeConversationId,
   );
   const messageIds = useAppStore((state) => state.chat.messageIds);
-  const isStreaming = useAppStore((state) => state.chat.isStreaming);
+  const isLoading = useAppStore((state) => state.chat.isLoading);
   const pendingQuery = useAppStore((state) => state.chat.pendingQuickBarQuery);
   const pendingHandled = useRef(false);
-  const conversationsLoaded = useRef(false);
 
   useEffect(() => {
-    if (!conversationsLoaded.current) {
-      conversationsLoaded.current = true;
-      void loadConversations();
-    }
+    void loadConversations();
   }, []);
 
   useEffect(() => {
@@ -113,13 +109,13 @@ export default function ChatPage() {
               flexDirection: "column",
             }}
           >
-            {messageIds.length === 0 && !isStreaming ? (
+            {messageIds.length === 0 && !isLoading ? (
               <ChatEmptyState />
             ) : (
               <ChatMessageList />
             )}
           </Box>
-          <ChatInput onSend={handleSend} disabled={isStreaming} />
+          <ChatInput onSend={handleSend} disabled={isLoading} />
         </Box>
       </Box>
     </Stack>
