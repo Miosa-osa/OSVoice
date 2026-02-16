@@ -89,16 +89,22 @@ pub fn save_transcription_audio(
 }
 
 pub fn delete_audio_file(app: &tauri::AppHandle, file_path: &Path) -> io::Result<()> {
-    let audio_dir = audio_dir(app)?;
+    let audio_dir = fs::canonicalize(audio_dir(app)?)?;
+    let canonical_path = fs::canonicalize(file_path).map_err(|err| {
+        if err.kind() == io::ErrorKind::NotFound {
+            return err;
+        }
+        io::Error::new(io::ErrorKind::PermissionDenied, "Invalid audio file path")
+    })?;
 
-    if !file_path.starts_with(&audio_dir) {
+    if !canonical_path.starts_with(&audio_dir) {
         return Err(io::Error::new(
             io::ErrorKind::PermissionDenied,
             "Refusing to delete audio outside of managed directory",
         ));
     }
 
-    match fs::remove_file(file_path) {
+    match fs::remove_file(&canonical_path) {
         Ok(()) => Ok(()),
         Err(err) if err.kind() == io::ErrorKind::NotFound => Ok(()),
         Err(err) => Err(err),

@@ -386,8 +386,12 @@ pub async fn transcription_audio_load(
     let audio_path = audio_path
         .ok_or_else(|| "No audio snapshot available for this transcription".to_string())?;
 
-    let audio_dir = crate::system::audio_store::audio_dir(&app).map_err(|err| err.to_string())?;
-    let audio_path_buf = PathBuf::from(&audio_path);
+    let audio_dir = std::fs::canonicalize(
+        crate::system::audio_store::audio_dir(&app).map_err(|err| err.to_string())?,
+    )
+    .map_err(|err| err.to_string())?;
+    let audio_path_buf = std::fs::canonicalize(PathBuf::from(&audio_path))
+        .map_err(|_| "Invalid audio file path".to_string())?;
 
     if !audio_path_buf.starts_with(&audio_dir) {
         return Err("Audio snapshot path is outside the managed directory".to_string());
