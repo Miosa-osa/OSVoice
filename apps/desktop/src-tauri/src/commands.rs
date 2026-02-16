@@ -1264,6 +1264,15 @@ pub async fn meeting_segments_create_batch(
     segments: Vec<crate::domain::MeetingSegment>,
     database: State<'_, crate::state::OptionKeyDatabase>,
 ) -> Result<Vec<crate::domain::MeetingSegment>, String> {
+    const MAX_BATCH_SEGMENTS: usize = 500;
+    if segments.len() > MAX_BATCH_SEGMENTS {
+        return Err(format!(
+            "Segment batch too large: {} segments (max {})",
+            segments.len(),
+            MAX_BATCH_SEGMENTS
+        ));
+    }
+
     crate::db::meeting_queries::insert_meeting_segments(database.pool(), &segments)
         .await
         .map_err(|err| err.to_string())
@@ -1317,6 +1326,15 @@ pub async fn meeting_append_audio_chunk(
     samples: Vec<f32>,
     writer_state: State<'_, crate::system::meeting_audio_store::MeetingAudioWriterState>,
 ) -> Result<(), String> {
+    const MAX_CHUNK_SAMPLES: usize = 960_000; // ~20 seconds at 48kHz
+    if samples.len() > MAX_CHUNK_SAMPLES {
+        return Err(format!(
+            "Audio chunk too large: {} samples (max {})",
+            samples.len(),
+            MAX_CHUNK_SAMPLES
+        ));
+    }
+
     let mut guard = writer_state.writer.lock().map_err(|err| err.to_string())?;
     let writer = guard
         .as_mut()

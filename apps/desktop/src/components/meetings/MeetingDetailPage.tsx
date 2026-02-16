@@ -40,6 +40,11 @@ export const MeetingDetailPage = memo(function MeetingDetailPage({
   const [titleDraft, setTitleDraft] = useState(meeting.title);
 
   useEffect(() => {
+    setTitleDraft(meeting.title);
+    setEditingTitle(false);
+  }, [meeting.id, meeting.title]);
+
+  useEffect(() => {
     void loadMeetingSegments(meeting.id);
   }, [meeting.id]);
 

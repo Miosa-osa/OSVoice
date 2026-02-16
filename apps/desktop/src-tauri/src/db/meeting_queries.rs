@@ -143,6 +143,8 @@ pub async fn insert_meeting_segments(
     pool: SqlitePool,
     segments: &[MeetingSegment],
 ) -> Result<Vec<MeetingSegment>, sqlx::Error> {
+    let mut tx = pool.begin().await?;
+
     for segment in segments {
         sqlx::query(
             "INSERT INTO meeting_segments (id, meeting_id, speaker_id, speaker_name, text, start_ms, end_ms, created_at)
@@ -156,9 +158,11 @@ pub async fn insert_meeting_segments(
         .bind(segment.start_ms)
         .bind(segment.end_ms)
         .bind(&segment.created_at)
-        .execute(&pool)
+        .execute(&mut *tx)
         .await?;
     }
+
+    tx.commit().await?;
 
     Ok(segments.to_vec())
 }

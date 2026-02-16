@@ -21,17 +21,34 @@ import { getMyPreferredMicrophone } from "../utils/user.utils";
 let audioChunkUnlisten: UnlistenFn | null = null;
 let chunkBuffer: number[] = [];
 let elapsedTimerHandle: ReturnType<typeof setInterval> | null = null;
+let isFlushing = false;
 
 const CHUNK_FLUSH_SIZE = 160_000;
 
+const cleanupRecordingResources = (): void => {
+  if (elapsedTimerHandle) {
+    clearInterval(elapsedTimerHandle);
+    elapsedTimerHandle = null;
+  }
+  if (audioChunkUnlisten) {
+    audioChunkUnlisten();
+    audioChunkUnlisten = null;
+  }
+  chunkBuffer = [];
+  isFlushing = false;
+};
+
 const flushChunkBuffer = async (): Promise<void> => {
-  if (chunkBuffer.length === 0) return;
+  if (isFlushing || chunkBuffer.length === 0) return;
+  isFlushing = true;
   const batch = chunkBuffer;
   chunkBuffer = [];
   try {
     await getMeetingRepo().appendAudioChunk(batch);
   } catch (error) {
     console.error("[meeting] Failed to append audio chunk:", error);
+  } finally {
+    isFlushing = false;
   }
 };
 
@@ -104,6 +121,12 @@ export const startMeetingRecording = async (): Promise<string | null> => {
 
     return meeting.id;
   } catch (error) {
+    cleanupRecordingResources();
+    try {
+      await invoke("stop_recording");
+    } catch {
+      // recording may not have started yet
+    }
     produceAppState((draft) => {
       delete draft.meetingById[meeting.id];
       draft.meeting.meetingIds = draft.meeting.meetingIds.filter(
@@ -124,15 +147,7 @@ export const stopMeetingRecording = async (): Promise<void> => {
   const meetingId = state.meeting.activeMeetingId;
   if (!meetingId || !state.meeting.isRecording) return;
 
-  if (elapsedTimerHandle) {
-    clearInterval(elapsedTimerHandle);
-    elapsedTimerHandle = null;
-  }
-
-  if (audioChunkUnlisten) {
-    audioChunkUnlisten();
-    audioChunkUnlisten = null;
-  }
+  cleanupRecordingResources();
 
   produceAppState((draft) => {
     draft.meeting.isRecording = false;
@@ -175,8 +190,19 @@ export const stopMeetingRecording = async (): Promise<void> => {
 };
 
 export const deleteMeeting = async (meetingId: string): Promise<void> => {
-  const meeting = getAppState().meetingById[meetingId];
+  const state = getAppState();
+  const meeting = state.meetingById[meetingId];
   if (!meeting) return;
+
+  const removedSegments: Record<string, MeetingSegment> = {};
+  const removedSegmentIds: string[] = [];
+  for (const segId of state.meeting.segmentIds) {
+    const seg = state.meetingSegmentById[segId];
+    if (seg?.meetingId === meetingId) {
+      removedSegments[segId] = seg;
+      removedSegmentIds.push(segId);
+    }
+  }
 
   produceAppState((draft) => {
     delete draft.meetingById[meetingId];
@@ -186,14 +212,11 @@ export const deleteMeeting = async (meetingId: string): Promise<void> => {
     if (draft.meeting.activeMeetingId === meetingId) {
       draft.meeting.activeMeetingId = null;
     }
-    for (const segId of draft.meeting.segmentIds) {
-      const seg = draft.meetingSegmentById[segId];
-      if (seg?.meetingId === meetingId) {
-        delete draft.meetingSegmentById[segId];
-      }
+    for (const segId of removedSegmentIds) {
+      delete draft.meetingSegmentById[segId];
     }
     draft.meeting.segmentIds = draft.meeting.segmentIds.filter(
-      (id) => draft.meetingSegmentById[id] !== undefined,
+      (id) => !removedSegmentIds.includes(id),
     );
   });
 
@@ -205,6 +228,13 @@ export const deleteMeeting = async (meetingId: string): Promise<void> => {
       if (!draft.meeting.meetingIds.includes(meetingId)) {
         draft.meeting.meetingIds.unshift(meetingId);
       }
+      for (const [segId, seg] of Object.entries(removedSegments)) {
+        draft.meetingSegmentById[segId] = seg;
+      }
+      draft.meeting.segmentIds = [
+        ...draft.meeting.segmentIds,
+        ...removedSegmentIds,
+      ];
     });
     showErrorSnackbar(error);
   }
