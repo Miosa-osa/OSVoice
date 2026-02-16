@@ -1,33 +1,32 @@
 import { MicRounded, SendRounded, StopRounded } from "@mui/icons-material";
 import { Box, CircularProgress, IconButton, TextField } from "@mui/material";
-import { invoke } from "@tauri-apps/api/core";
 import { useCallback, useRef, useState } from "react";
 import { useIntl } from "react-intl";
-import { showErrorSnackbar } from "../../actions/app.actions";
-import { createTranscriptionSession } from "../../sessions";
-import { getAppState } from "../../store";
-import type {
-  StopRecordingResponse,
-  TranscriptionSession,
-} from "../../types/transcription-session.types";
-import {
-  getMyPreferredMicrophone,
-  getTranscriptionPrefs,
-} from "../../utils/user.utils";
+import { useVoiceRecording } from "../../hooks/voice-recording.hooks";
 
 type ChatInputProps = {
   onSend: (content: string) => void;
   disabled?: boolean;
 };
 
-type RecordingState = "idle" | "recording" | "transcribing";
-
 export const ChatInput = ({ onSend, disabled }: ChatInputProps) => {
   const intl = useIntl();
   const [value, setValue] = useState("");
-  const [recordingState, setRecordingState] = useState<RecordingState>("idle");
   const inputRef = useRef<HTMLInputElement>(null);
-  const sessionRef = useRef<TranscriptionSession | null>(null);
+
+  const onTranscript = useCallback((text: string) => {
+    setValue((prev) => {
+      const current = prev.trim();
+      const combined = current ? `${current} ${text}` : text;
+      return combined.slice(0, 10000);
+    });
+    inputRef.current?.focus();
+  }, []);
+
+  const { recordingState, toggle } = useVoiceRecording({ onTranscript });
+
+  const isRecording = recordingState === "recording";
+  const isTranscribing = recordingState === "transcribing";
 
   const handleSend = useCallback(() => {
     const trimmed = value.trim();
@@ -46,67 +45,6 @@ export const ChatInput = ({ onSend, disabled }: ChatInputProps) => {
     },
     [handleSend],
   );
-
-  const handleStartRecording = useCallback(async () => {
-    try {
-      const state = getAppState();
-      const prefs = getTranscriptionPrefs(state);
-      const preferredMic = getMyPreferredMicrophone(state);
-
-      sessionRef.current = createTranscriptionSession(prefs);
-
-      const startResp = await invoke<{ sampleRate: number }>(
-        "start_recording",
-        { args: { preferredMicrophone: preferredMic } },
-      );
-
-      await sessionRef.current.onRecordingStart(startResp.sampleRate);
-      setRecordingState("recording");
-    } catch (error) {
-      showErrorSnackbar(error);
-      sessionRef.current?.cleanup();
-      sessionRef.current = null;
-      setRecordingState("idle");
-    }
-  }, []);
-
-  const handleStopRecording = useCallback(async () => {
-    setRecordingState("transcribing");
-    try {
-      const audio = await invoke<StopRecordingResponse>("stop_recording");
-      const session = sessionRef.current;
-
-      if (session) {
-        const result = await session.finalize(audio);
-        session.cleanup();
-        sessionRef.current = null;
-
-        if (result.rawTranscript) {
-          const current = value.trim();
-          const transcript = result.rawTranscript.trim();
-          const combined = current ? `${current} ${transcript}` : transcript;
-          setValue(combined.slice(0, 10000));
-          inputRef.current?.focus();
-        }
-      }
-    } catch (error) {
-      showErrorSnackbar(error);
-      sessionRef.current?.cleanup();
-      sessionRef.current = null;
-    }
-    setRecordingState("idle");
-  }, [value]);
-
-  const handleMicClick = useCallback(() => {
-    if (recordingState === "recording") {
-      void handleStopRecording();
-    } else if (recordingState === "idle") {
-      void handleStartRecording();
-    }
-  }, [recordingState, handleStartRecording, handleStopRecording]);
-
-  const isRecording = recordingState === "recording";
-  const isTranscribing = recordingState === "transcribing";
 
   return (
     <Box
@@ -132,9 +70,14 @@ export const ChatInput = ({ onSend, disabled }: ChatInputProps) => {
         })}
       >
         <IconButton
-          onClick={handleMicClick}
+          onClick={toggle}
           disabled={disabled || isTranscribing}
           size="small"
+          aria-label={
+            isRecording
+              ? intl.formatMessage({ defaultMessage: "Stop recording" })
+              : intl.formatMessage({ defaultMessage: "Start voice input" })
+          }
           sx={(theme) => ({
             color: isRecording ? "#ef4444" : theme.vars?.palette.text.secondary,
           })}
@@ -175,6 +118,7 @@ export const ChatInput = ({ onSend, disabled }: ChatInputProps) => {
           onClick={handleSend}
           disabled={!value.trim() || disabled || isRecording}
           size="small"
+          aria-label={intl.formatMessage({ defaultMessage: "Send message" })}
           sx={(theme) => ({
             color: value.trim()
               ? theme.vars?.palette.blue

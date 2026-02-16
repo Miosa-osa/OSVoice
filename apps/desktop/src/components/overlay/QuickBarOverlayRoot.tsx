@@ -13,13 +13,11 @@ import {
   InputBase,
   Typography,
 } from "@mui/material";
-import { invoke } from "@tauri-apps/api/core";
 import { emitTo } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useIntl } from "react-intl";
-
-type VoiceState = "idle" | "recording" | "transcribing";
+import { useVoiceRecording } from "../../hooks/voice-recording.hooks";
 
 const INTERACTIVE_SELECTOR =
   'button, input, textarea, select, a, [role="button"]';
@@ -39,9 +37,26 @@ const menuItemSx = {
 export const QuickBarOverlayRoot = () => {
   const intl = useIntl();
   const [value, setValue] = useState("");
-  const [voiceState, setVoiceState] = useState<VoiceState>("idle");
   const [menuOpen, setMenuOpen] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  const onTranscript = useCallback((text: string) => {
+    setValue((prev) => {
+      const current = prev.trim();
+      return current ? `${current} ${text}` : text;
+    });
+  }, []);
+
+  const onError = useCallback((error: unknown) => {
+    console.error("Voice recording failed", error);
+  }, []);
+
+  const { recordingState, toggle } = useVoiceRecording({
+    onTranscript,
+    onError,
+  });
+
+  const isRecording = recordingState === "recording";
 
   useEffect(() => {
     document.body.style.margin = "0";
@@ -78,46 +93,6 @@ export const QuickBarOverlayRoot = () => {
     },
     [handleSend, menuOpen],
   );
-
-  const handleMicClick = useCallback(async () => {
-    if (voiceState === "recording") {
-      setVoiceState("transcribing");
-      try {
-        const audio = await invoke<{ samples: number[]; sampleRate?: number }>(
-          "stop_recording",
-        );
-        const samples = Array.isArray(audio.samples)
-          ? audio.samples
-          : Array.from(audio.samples ?? []);
-        const rate = audio.sampleRate ?? 16000;
-
-        const MAX_SAMPLES = 5_000_000;
-        if (samples.length > 0 && samples.length <= MAX_SAMPLES && rate > 0) {
-          const transcript = await invoke<string>("transcribe_audio", {
-            samples,
-            sampleRate: rate,
-          });
-          if (transcript) {
-            const current = value.trim();
-            setValue(current ? `${current} ${transcript}` : transcript);
-          }
-        }
-      } catch (error) {
-        console.error("Voice transcription failed", error);
-      }
-      setVoiceState("idle");
-    } else if (voiceState === "idle") {
-      try {
-        await invoke("start_recording", {
-          args: { preferredMicrophone: null },
-        });
-        setVoiceState("recording");
-      } catch (error) {
-        console.error("Failed to start recording", error);
-        setVoiceState("idle");
-      }
-    }
-  }, [voiceState, value]);
 
   const handlePillMouseDown = useCallback((e: React.MouseEvent) => {
     if (e.button !== 0) return;
@@ -229,12 +204,12 @@ export const QuickBarOverlayRoot = () => {
           onChange={(e) => setValue(e.target.value)}
           onKeyDown={handleKeyDown}
           placeholder={
-            voiceState === "recording"
+            isRecording
               ? intl.formatMessage({ defaultMessage: "Listening..." })
               : intl.formatMessage({ defaultMessage: "Ask OSVoice..." })
           }
           fullWidth
-          disabled={voiceState === "recording"}
+          disabled={isRecording}
           sx={{
             color: "#FFFFFF",
             fontSize: "13px",
@@ -265,24 +240,26 @@ export const QuickBarOverlayRoot = () => {
         </Box>
 
         <IconButton
-          onClick={() => void handleMicClick()}
+          onClick={toggle}
           size="small"
+          aria-label={
+            isRecording
+              ? intl.formatMessage({ defaultMessage: "Stop recording" })
+              : intl.formatMessage({ defaultMessage: "Start voice input" })
+          }
           sx={{
             width: "28px",
             height: "28px",
             flexShrink: 0,
-            color:
-              voiceState === "recording"
-                ? "#ef4444"
-                : "rgba(255, 255, 255, 0.5)",
+            color: isRecording ? "#ef4444" : "rgba(255, 255, 255, 0.5)",
             "&:hover": {
               backgroundColor: "rgba(255, 255, 255, 0.1)",
             },
           }}
         >
-          {voiceState === "transcribing" ? (
+          {recordingState === "transcribing" ? (
             <CircularProgress size={14} sx={{ color: "#fff" }} />
-          ) : voiceState === "recording" ? (
+          ) : isRecording ? (
             <StopRounded sx={{ fontSize: "16px" }} />
           ) : (
             <MicRounded sx={{ fontSize: "16px" }} />
@@ -293,6 +270,7 @@ export const QuickBarOverlayRoot = () => {
           <IconButton
             onClick={handleSend}
             size="small"
+            aria-label={intl.formatMessage({ defaultMessage: "Send query" })}
             sx={{
               width: "28px",
               height: "28px",
@@ -311,6 +289,7 @@ export const QuickBarOverlayRoot = () => {
           <IconButton
             size="small"
             onClick={handleMenuToggle}
+            aria-label={intl.formatMessage({ defaultMessage: "Open menu" })}
             sx={{
               width: "28px",
               height: "28px",
