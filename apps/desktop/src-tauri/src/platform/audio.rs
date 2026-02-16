@@ -129,11 +129,9 @@ impl ChunkEmitter {
         };
 
         if should_emit {
-            // Drain the buffer and send the chunk
             if let Ok(mut buffer) = self.buffer.lock() {
                 if !buffer.is_empty() {
-                    let chunk = buffer.clone();
-                    buffer.clear();
+                    let chunk = std::mem::take(&mut *buffer);
                     (self.callback)(chunk);
                 }
             }

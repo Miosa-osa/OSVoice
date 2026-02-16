@@ -1,6 +1,6 @@
 use crate::platform::{GpuDescriptor, Transcriber, TranscriptionDevice, TranscriptionRequest};
 use std::collections::HashMap;
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, RwLock};
 use whisper_rs::{
     FullParams, SamplingStrategy, WhisperContext, WhisperContextParameters, WhisperError,
 };
@@ -17,10 +17,12 @@ use whisper_rs::vulkan;
 ))]
 const DISABLE_ENV: &str = "OSVOICE_WHISPER_DISABLE_GPU";
 
+const MAX_CONTEXT_CACHE_ENTRIES: usize = 4;
+
 pub struct WhisperTranscriber {
     model_path: String,
     default_context: Arc<WhisperContext>,
-    context_cache: Mutex<HashMap<ContextCacheKey, Arc<WhisperContext>>>,
+    context_cache: RwLock<HashMap<ContextCacheKey, Arc<WhisperContext>>>,
 }
 
 enum ContextStrategy<'a> {
@@ -70,7 +72,7 @@ impl WhisperTranscriber {
         Ok(Self {
             model_path: model_path_string,
             default_context,
-            context_cache: Mutex::new(cache),
+            context_cache: RwLock::new(cache),
         })
     }
 
@@ -111,7 +113,7 @@ impl WhisperTranscriber {
         let cache_key = ContextCacheKey::new(model_path_ref, cache_variant.clone());
 
         if let Some(existing) = {
-            let cache = self.context_cache.lock().unwrap();
+            let cache = self.context_cache.read().unwrap();
             cache.get(&cache_key).cloned()
         } {
             return Ok(existing);
@@ -119,7 +121,10 @@ impl WhisperTranscriber {
 
         let context = Self::load_context(model_path_ref, strategy)?;
 
-        let mut cache = self.context_cache.lock().unwrap();
+        let mut cache = self.context_cache.write().unwrap();
+        if cache.len() >= MAX_CONTEXT_CACHE_ENTRIES && !cache.contains_key(&cache_key) {
+            cache.clear();
+        }
         Ok(cache
             .entry(cache_key)
             .or_insert_with(|| context.clone())
