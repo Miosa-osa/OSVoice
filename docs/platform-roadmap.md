@@ -1,14 +1,14 @@
 # OSVoice Platform Roadmap
 
-> Last updated: 2026-02-16
-> Branch: `feature/phase-2-meetings`
+> Last updated: 2026-02-17
+> Branch: `dev` (all phases merged to `main`)
 > Reference: `docs/gap-analysis-highlight-ai.md`
 
 ---
 
 ## Platform Overview
 
-OSVoice is a local-first, cross-platform voice-to-text desktop app built with Tauri (Rust + TypeScript/React). It currently ships with **65+ Tauri commands**, **49 database migrations**, **7 transcription providers**, **9 LLM providers**, **4 overlay windows**, and full cross-platform support (macOS, Windows, Linux).
+OSVoice is a local-first, cross-platform voice-to-text desktop app built with Tauri (Rust + TypeScript/React). It currently ships with **76+ Tauri commands**, **52 database migrations**, **7 transcription providers**, **9 LLM providers**, **4 overlay windows**, **1 diarization provider**, and full cross-platform support (macOS, Windows, Linux).
 
 The roadmap evolves OSVoice from a dictation tool into a **full AI productivity assistant** — competing with Highlight AI while keeping OSVoice's core strengths: local-first privacy, multi-provider flexibility, and app-specific intelligence.
 
@@ -75,122 +75,119 @@ The roadmap evolves OSVoice from a dictation tool into a **full AI productivity 
 
 ---
 
-## Phase 1: AI Chat + Quick Bar (IN PROGRESS)
+## Phase 1: AI Chat + Quick Bar (COMPLETE)
 
-**Branch:** `feature/phase-1-ai-chat`
+**Branch:** `feature/phase-1-ai-chat` (merged to main)
 **Goal:** Transform OSVoice from dictation-only into a conversational AI assistant.
 
 ### Completed
 
-| Feature | Files | Notes |
-|---------|-------|-------|
-| Conversations DB table | `049_conversations.sql` | conversations + messages, FK cascade, composite index |
-| Rust domain + queries | `conversation.rs`, `conversation_queries.rs` | 6 queries, full CRUD |
-| Rust commands | `commands.rs` | 6 commands, registered in `app.rs` |
-| Shared types | `@repo/types/conversation.types.ts` | Conversation, Message, MessageRole, ChatMessage |
-| TypeScript repo | `conversation.repo.ts` | BaseConversationRepo → LocalConversationRepo |
-| Chat actions | `chat.actions.ts` | create, load, send, delete + optimistic updates |
-| Chat state | `chat.state.ts` | Normalized entity maps + UI state |
-| ChatPage | `ChatPage.tsx` | Two-panel layout, conversation + messages |
-| ChatMessageList | `ChatMessageList.tsx` | Virtualized (react-virtuoso), auto-scroll, typing indicator |
-| ChatMessageBubble | `ChatMessageBubble.tsx` | Markdown (react-markdown + rehype-sanitize), React.memo |
-| ChatInput | `ChatInput.tsx` | Text + voice input, recording states |
-| ChatConversationList | `ChatConversationList.tsx` | Sidebar, React.memo on items |
-| ChatEmptyState | `ChatEmptyState.tsx` | Placeholder UI |
-| Quick bar overlay | `QuickBarOverlayRoot.tsx` | Glassy bar, voice input, menu, event bridge |
-| Quick bar window | `overlay.rs` | 320x250, focusable, bottom-center |
-| Event flow | `RootSideEffects.ts` | quick-bar-query → state → ChatPage |
-| Routing | `router.tsx` | /dashboard/chat route |
-| Dashboard nav | `DashboardMenu.tsx` | Chat link with AI sparkle icon |
-| Glassy UI theme | `theme.ts`, `mui.d.ts` | Glass palette vars, backdrop-filter blur |
-| Audit fixes | Multiple | rehype-sanitize, React.memo, Virtuoso, shallow equality, composite DB index, input validation |
+| Feature | Commits | Notes |
+|---------|---------|-------|
+| Conversations DB table | `5da6627` | conversations + messages, FK cascade, composite index (migration 049) |
+| Rust domain + queries + 6 commands | `5da6627` | Full CRUD registered in `app.rs` |
+| Shared types | `5da6627` | `@repo/types/conversation.types.ts` |
+| TypeScript repo + actions + state | `5da6627` | Optimistic updates, normalized entity maps |
+| ChatPage (two-panel layout) | `b05d094` | Conversation sidebar + message list |
+| ChatMessageList (virtualized) | `b05d094` | react-virtuoso, auto-scroll, typing indicator |
+| ChatMessageBubble (markdown) | `b05d094` | react-markdown + rehype-sanitize, React.memo |
+| ChatInput (text + voice) | `b05d094` | Recording states, voice input in chat |
+| ChatConversationList | `b05d094` | Sidebar with React.memo on items |
+| ChatEmptyState | `b05d094` | Placeholder UI |
+| Quick bar overlay | `dbbf90f` | Glassy bar, voice input, menu, event bridge (320x250) |
+| Glassy UI theme | `dbbf90f` | Glass palette vars, backdrop-filter blur |
+| Dashboard routing + nav | `dbbf90f` | /dashboard/chat route, AI sparkle icon |
+| Code review fixes | `89972e3` | State cleanup, rollback, input validation, accessibility |
+| Streaming LLM responses | `c25d7db` | RAF batching, stop support, incremental rendering |
+| Streaming for Claude + Gemini | `7220626` | Provider-specific streaming implementations |
+| Context attachment | `7220626` | Attach transcriptions/files to chat messages |
+| Provider deduplication | `8e00d75` | `openai-compat.utils.ts` (~520 lines deduplicated across 5 providers) |
+| useVoiceRecording hook | `ca750f1` | Extracted from ChatInput to shared hook |
 
-### Remaining
+### Remaining (Nice-to-Have)
 
 | Feature | Priority | Effort | Description |
 |---------|----------|--------|-------------|
-| **Streaming responses** | High | Large | Token-by-token rendering as LLM generates. Requires `generateChatStream()` on all 9 providers + incremental UI rendering. |
-| **Context attachment** | High | Large | Attach transcriptions, screen content, or files to chat messages. UI picker + `context_json` field in messages. |
-| **@mention model selection** | Medium | Medium | Type `@claude` or `@gpt-4o` in chat to override the default model per-message. Parse input, swap provider. |
-| **Global hotkey for quick bar** | Medium | Small | Register Cmd+Shift+Space (or similar) to toggle quick bar visibility. Wire into existing hotkey system. |
-| **Draggable quick bar** | Low | Small | Save position to preferences, restore on startup. Use Tauri `startDragging()` (partially implemented). |
-| **Conversation search** | Low | Small | Filter/search conversation list by title. Local string matching. |
+| **@mention model selection** | Medium | Medium | Type `@claude` or `@gpt-4o` in chat to override the default model per-message. |
+| **Global hotkey for quick bar** | Medium | Small | Register Cmd+Shift+Space (or similar) to toggle quick bar visibility. |
+| **Draggable quick bar** | Low | Small | Save position to preferences, restore on startup. |
+| **Conversation search** | Low | Small | Filter/search conversation list by title. |
 
 ### Phase 1 Completion Criteria
-- [ ] Chat works end-to-end (send message → get AI response)
-- [ ] Voice input works in chat
-- [ ] Quick bar sends queries to chat
-- [ ] Conversations persist across restarts
-- [ ] Streaming responses show tokens in real-time
-- [ ] Can attach context (at least transcriptions) to chat
+- [x] Chat works end-to-end (send message -> get AI response)
+- [x] Voice input works in chat
+- [x] Quick bar sends queries to chat
+- [x] Conversations persist across restarts
+- [x] Streaming responses show tokens in real-time
+- [x] Can attach context (at least transcriptions) to chat
 
 ---
 
-## Phase 2: Meeting Intelligence
+## Phase 2: Meeting Intelligence (COMPLETE — Core)
 
+**Branch:** `feature/phase-2-meetings` → merged to `dev` → merged to `main` (PR #4)
 **Goal:** Capture, transcribe, and summarize meetings with speaker identification.
 
-### 2.1 System Audio Capture
-| Item | Description | Effort |
-|------|-------------|--------|
-| macOS audio capture | ScreenCaptureKit API for system audio | Large |
-| Windows audio capture | WASAPI loopback capture | Large |
-| Linux audio capture | PulseAudio monitor source | Medium |
-| Long-running recording | Handle hours-long meetings, chunked transcription | Medium |
-| Recording UI | Start/stop, duration timer, waveform | Medium |
+### Completed (Infrastructure — 33 files, commit `3f02c4e`)
 
-**New Rust module:** `platform/system_audio.rs` (platform-specific implementations)
+| Feature | Layer | Notes |
+|---------|-------|-------|
+| Database schema (migration 051) | Rust | `meetings` + `meeting_segments` tables, FK cascade, indexes |
+| Rust domain + queries + 11 commands | Rust | Full CRUD, batch insert, audio writer, speaker rename |
+| Streaming WAV writer | Rust | `MeetingWavWriter` with append_samples + finalize |
+| Meeting audio store | Rust | Path management, sanitized IDs, path traversal protection |
+| Shared types | `@repo/types` | `Meeting`, `MeetingSegment`, `MeetingStatus` |
+| Meeting repo | TypeScript | `LocalMeetingRepo` with all invoke() calls |
+| AssemblyAI diarization | TypeScript | `AssemblyAIDiarizeRepo` for API-based speaker ID |
+| Meeting actions | TypeScript | Start/stop recording, process, summarize, CRUD, speaker rename |
+| Meeting prompt utils | TypeScript | Summary prompt builder + JSON response parser |
+| Full meeting UI (9 components) | React | MeetingsPage, DetailPage, List, Timeline, Summary, ActionItems, EmptyState, RecordingBar, SpeakerRenameDialog |
+| Dashboard routing + nav | React | /dashboard/meetings route |
 
-### 2.2 Meeting Detection
-| Item | Description | Effort |
-|------|-------------|--------|
-| App detection | Detect Zoom, Teams, Meet, Slack huddle, Discord | Medium |
-| Auto-start recording | Prompt user when meeting app detected | Small |
-| Meeting metadata | Title, participants, duration, app source | Small |
+### Code Review Fixes (commit `80d399c`, on branch)
 
-**New Rust module:** `platform/meeting_detector.rs`
+| Fix | Category |
+|-----|----------|
+| Memory leak in error path | Bug — `cleanupRecordingResources()` + `stop_recording` in catch |
+| Flush race condition | Bug — `isFlushing` mutex flag with `finally` reset |
+| DoS: audio chunk cap | Security — 960K samples max (~20s @ 48kHz) |
+| DoS: segment batch cap | Security — 500 segments max per batch |
+| Segment rollback on delete | Bug — Snapshot + restore segments on failure |
+| Transaction on batch insert | Data integrity — `pool.begin()` / `tx.commit()` |
+| Stale titleDraft | UI — `useEffect` syncs on `meeting.id` change |
 
-### 2.3 Speaker Diarization
-| Item | Description | Effort |
-|------|-------------|--------|
-| API-based diarization | Deepgram or AssemblyAI (start here) | Medium |
-| Local diarization | pyannote.audio or whisperX (future) | Very Large |
-| Speaker naming | Manual assignment → learn over time | Medium |
-| Voice fingerprinting | Recurring speaker recognition | Large |
+### Remaining: Quality & Security
 
-**New repos:** `DiarizeAudioRepo` → `DeepgramDiarizeRepo`, `AssemblyAIDiarizeRepo`
+| Item | Priority | Effort |
+|------|----------|--------|
+| State subscription perf in `MeetingTranscriptTimeline` | Should Fix | Small |
+| Array recreation perf in `MeetingsPage` | Should Fix | Small |
+| Error boundaries around meeting routes | Should Fix | Small |
+| i18n completion (hardcoded strings) | Should Fix | Small |
+| String length validation on meeting fields | Medium Security | Small |
+| Time range validation on segments | Medium Security | Small |
+| Total audio duration cap (~4 hours) | Medium Security | Small |
 
-### 2.4 Meeting Summaries
-| Item | Description | Effort |
-|------|-------------|--------|
-| Auto-summary generation | LLM summarizes transcript when recording stops | Medium |
-| Action item extraction | Detect tasks, assignees, deadlines | Medium |
-| Key decisions | Extract decisions and topics | Small |
-| Meeting Q&A | "What did we decide about X?" over past meetings | Medium |
+### Remaining: Feature Gaps
 
-### 2.5 Meeting UI
-| Item | Description | Effort |
-|------|-------------|--------|
-| MeetingsPage | List view with search/filter | Medium |
-| MeetingDetailView | Summary + transcript + timeline | Large |
-| MeetingTranscriptTimeline | Speaker-labeled segments with timestamps | Large |
-| ActionItemList | Extracted tasks with checkboxes | Small |
-
-### New Database Tables
-```sql
-meetings (id, title, app_source, started_at, ended_at, duration_seconds,
-          summary, status, audio_path)
-meeting_segments (id, meeting_id, speaker_id, speaker_name, text,
-                  start_ms, end_ms)
-```
+| Item | Priority | Effort |
+|------|----------|--------|
+| **System audio capture (macOS)** | High | Large |
+| **Meeting app detection** | Medium | Medium |
+| Local diarization | Low | Very Large |
+| Voice fingerprinting | Low | Large |
+| Meeting Q&A | Low | Medium |
+| Shareable summaries | Low | Medium |
 
 ### Phase 2 Completion Criteria
-- [ ] Can record system audio on macOS (at minimum)
-- [ ] Meeting transcription with timestamps
-- [ ] Speaker diarization (API-based)
-- [ ] Auto-generated meeting summary
-- [ ] Action items extracted
-- [ ] Meeting list + detail UI
+- [x] Meeting list + detail UI
+- [x] Mic-based meeting recording with chunked audio
+- [x] Meeting transcription with timestamps
+- [x] Speaker diarization (API-based via AssemblyAI)
+- [x] Auto-generated meeting summary via LLM
+- [x] Action items extracted
+- [ ] System audio capture on macOS
+- [ ] Meeting app detection
 
 ---
 
@@ -433,7 +430,7 @@ Each follows the repo pattern: `SlackIntegrationRepo`, `NotionIntegrationRepo`, 
 ├─────┼─────────────────────────────────────────┼─────┤
 │     │     Tauri Command Bridge (Rust API)     │     │
 │  ┌──┴─────────────────────────────────────────┴───┐ │
-│  │  65+ commands  │  invoke() from TypeScript     │ │
+│  │  76+ commands  │  invoke() from TypeScript     │ │
 │  └──┬─────────────────────────────────────────┬───┘ │
 ├─────┼─────────────────────────────────────────┼─────┤
 │     │          Rust Backend                    │     │
@@ -441,7 +438,7 @@ Each follows the repo pattern: `SlackIntegrationRepo`, `NotionIntegrationRepo`, 
 │  │SQLite│  │Whisper  │  │Platform  │  │ System   │ │
 │  │  DB  │  │Inference│  │ (audio,  │  │(GPU,tray │ │
 │  │      │  │(GPU)    │  │keyboard, │  │ models,  │ │
-│  │49    │  │         │  │ a11y,    │  │ crypto)  │ │
+│  │52    │  │         │  │ a11y,    │  │ crypto)  │ │
 │  │migr. │  │         │  │ window)  │  │          │ │
 │  └──────┘  └────────┘  └──────────┘  └──────────┘ │
 └─────────────────────────────────────────────────────┘
@@ -451,9 +448,45 @@ AI Provider Layer (TypeScript, via @repo/voice-ai):
 │  Transcription: Local│Groq│OpenAI│Azure│Gemini│Aldea │
 │  LLM: Groq│OpenAI│Claude│Gemini│DeepSeek│Azure│      │
 │       OpenRouter│Ollama│Cloud                         │
-│  Diarization: Deepgram│AssemblyAI (Phase 2)          │
+│  Diarization: AssemblyAI (done)│Deepgram (future)     │
 └──────────────────────────────────────────────────────┘
 ```
+
+---
+
+## Security Hardening (COMPLETE, merged to main)
+
+A 5-agent architecture audit identified and resolved critical vulnerabilities:
+
+| Fix | Severity | Commit |
+|-----|----------|--------|
+| Crypto: HMAC-SHA256 -> ChaCha20Poly1305 AEAD | CRITICAL | `c57b30f` |
+| Content Security Policy headers in Tauri | CRITICAL | `c57b30f` |
+| Sign-up input validation (Zod) | CRITICAL | `c57b30f` |
+| Path traversal: audio_store.rs (canonicalize) | HIGH | `bd4a74f` |
+| Path traversal: commands.rs transcription_audio_load | HIGH | `bd4a74f` |
+| DB index on transcriptions(timestamp DESC) | HIGH | `bd4a74f` |
+| Whisper cache: Mutex -> RwLock, bounded to 4 entries | HIGH | `bd4a74f` |
+| Audio buffer: zero-copy with std::mem::take() | HIGH | `bd4a74f` |
+
+### Remaining Security Items
+
+| Item | Severity | Scope |
+|------|----------|-------|
+| String length validation on meeting fields | Medium | `commands.rs` |
+| Time range validation on segments | Medium | `commands.rs` |
+| Total audio duration cap | Medium | `commands.rs` |
+| Firebase IDOR checks | Medium | Firebase functions |
+
+---
+
+## Architecture Debt
+
+| Item | Scope | Effort |
+|------|-------|--------|
+| Decompose `commands.rs` (~1400 lines) | Split into `commands/transcription.rs`, `commands/meeting.rs`, `commands/chat.rs`, etc. | Large |
+| Decompose `RootSideEffects.ts` (~300 lines) | Split into `useChatSideEffects`, `useMeetingSideEffects`, etc. | Medium |
+| Pre-existing lint warnings (~17 files) | Not from recent work. Clean up incrementally. | Small |
 
 ---
 
@@ -467,10 +500,10 @@ AI Provider Layer (TypeScript, via @repo/voice-ai):
 │ Quick Bar  │ Recording     │ OCR/Search    │ Calendar │
 │ Streaming  │ Diarization   │ Browser Ext   │ Daily    │
 │ Context    │ Summaries     │ Universal     │ Overview │
-│            │               │ Search        │          │
-├────────────┤               │               │          │
-│ ██████░░░░ │               │               │          │
-│ ~80% done  │               │               │          │
+│ Security   │ (Sys Audio    │ Search        │          │
+├────────────┤  deferred)    │               │          │
+│ ██████████ │ ██████████    │               │          │
+│  COMPLETE  │ CORE COMPLETE │               │          │
 └────────────┴───────────────┴───────────────┴──────────┘
                                               │
                                      Phase 5 (2027 Q1)
