@@ -1185,3 +1185,64 @@ pub async fn initialize_local_transcriber(
 
     Ok(true)
 }
+
+#[tauri::command]
+pub async fn conversation_create(
+    conversation: crate::domain::Conversation,
+    database: State<'_, crate::state::OptionKeyDatabase>,
+) -> Result<crate::domain::Conversation, String> {
+    crate::db::conversation_queries::insert_conversation(database.pool(), &conversation)
+        .await
+        .map_err(|err| err.to_string())
+}
+
+#[tauri::command]
+pub async fn conversation_list(
+    limit: u32,
+    offset: u32,
+    database: State<'_, crate::state::OptionKeyDatabase>,
+) -> Result<Vec<crate::domain::Conversation>, String> {
+    crate::db::conversation_queries::fetch_conversations(database.pool(), limit, offset)
+        .await
+        .map_err(|err| err.to_string())
+}
+
+#[tauri::command]
+pub async fn conversation_update(
+    conversation: crate::domain::Conversation,
+    database: State<'_, crate::state::OptionKeyDatabase>,
+) -> Result<crate::domain::Conversation, String> {
+    crate::db::conversation_queries::update_conversation(database.pool(), &conversation)
+        .await
+        .map_err(|err| err.to_string())
+}
+
+#[tauri::command]
+pub async fn conversation_delete(
+    id: String,
+    database: State<'_, crate::state::OptionKeyDatabase>,
+) -> Result<(), String> {
+    crate::db::conversation_queries::delete_conversation(database.pool(), &id)
+        .await
+        .map_err(|err| err.to_string())
+}
+
+#[tauri::command]
+pub async fn message_create(
+    message: crate::domain::Message,
+    database: State<'_, crate::state::OptionKeyDatabase>,
+) -> Result<crate::domain::Message, String> {
+    crate::db::conversation_queries::insert_message(database.pool(), &message)
+        .await
+        .map_err(|err| err.to_string())
+}
+
+#[tauri::command]
+pub async fn message_list(
+    conversation_id: String,
+    database: State<'_, crate::state::OptionKeyDatabase>,
+) -> Result<Vec<crate::domain::Message>, String> {
+    crate::db::conversation_queries::fetch_messages(database.pool(), &conversation_id)
+        .await
+        .map_err(|err| err.to_string())
+}

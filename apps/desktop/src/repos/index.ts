@@ -49,6 +49,10 @@ import {
   LocalTranscriptionRepo,
 } from "./transcription.repo";
 import { BaseUserRepo, CloudUserRepo, LocalUserRepo } from "./user.repo";
+import {
+  BaseConversationRepo,
+  LocalConversationRepo,
+} from "./conversation.repo";
 
 const shouldUseCloud = () => getHasCloudAccess(getAppState());
 
@@ -86,6 +90,10 @@ export const getApiKeyRepo = (): BaseApiKeyRepo => {
 
 export const getToneRepo = (): BaseToneRepo => {
   return new LocalToneRepo();
+};
+
+export const getConversationRepo = (): BaseConversationRepo => {
+  return new LocalConversationRepo();
 };
 
 export const getStorageRepo = (): BaseStorageRepo => {

@@ -18,6 +18,9 @@ declare module "@mui/material/styles" {
     level1: string;
     level2: string;
     level3: string;
+
+    glass: string;
+    glassBorder: string;
   }
   interface PaletteOptions {
     goldBg?: string;
@@ -32,6 +35,9 @@ declare module "@mui/material/styles" {
     level1?: string;
     level2?: string;
     level3?: string;
+
+    glass?: string;
+    glassBorder?: string;
   }
 }
 
@@ -49,6 +55,7 @@ declare module "@mui/material/Card" {
 declare module "@mui/material/Paper" {
   interface PaperPropsVariantOverrides {
     flat: true;
+    glass: true;
   }
 }
 
