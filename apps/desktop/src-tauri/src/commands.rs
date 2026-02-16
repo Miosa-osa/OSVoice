@@ -386,8 +386,12 @@ pub async fn transcription_audio_load(
     let audio_path = audio_path
         .ok_or_else(|| "No audio snapshot available for this transcription".to_string())?;
 
-    let audio_dir = crate::system::audio_store::audio_dir(&app).map_err(|err| err.to_string())?;
-    let audio_path_buf = PathBuf::from(&audio_path);
+    let audio_dir = std::fs::canonicalize(
+        crate::system::audio_store::audio_dir(&app).map_err(|err| err.to_string())?,
+    )
+    .map_err(|err| err.to_string())?;
+    let audio_path_buf = std::fs::canonicalize(PathBuf::from(&audio_path))
+        .map_err(|_| "Invalid audio file path".to_string())?;
 
     if !audio_path_buf.starts_with(&audio_dir) {
         return Err("Audio snapshot path is outside the managed directory".to_string());
@@ -1184,6 +1188,198 @@ pub async fn initialize_local_transcriber(
     eprintln!("[initialize_local_transcriber] Whisper transcriber initialized successfully");
 
     Ok(true)
+}
+
+#[tauri::command]
+pub async fn meeting_create(
+    meeting: crate::domain::Meeting,
+    database: State<'_, crate::state::OptionKeyDatabase>,
+) -> Result<crate::domain::Meeting, String> {
+    crate::db::meeting_queries::insert_meeting(database.pool(), &meeting)
+        .await
+        .map_err(|err| err.to_string())
+}
+
+#[tauri::command]
+pub async fn meeting_list(
+    limit: u32,
+    offset: u32,
+    database: State<'_, crate::state::OptionKeyDatabase>,
+) -> Result<Vec<crate::domain::Meeting>, String> {
+    crate::db::meeting_queries::fetch_meetings(database.pool(), limit, offset)
+        .await
+        .map_err(|err| err.to_string())
+}
+
+#[tauri::command]
+pub async fn meeting_update(
+    meeting: crate::domain::Meeting,
+    database: State<'_, crate::state::OptionKeyDatabase>,
+) -> Result<crate::domain::Meeting, String> {
+    crate::db::meeting_queries::update_meeting(database.pool(), &meeting)
+        .await
+        .map_err(|err| err.to_string())
+}
+
+#[tauri::command]
+pub async fn meeting_delete(
+    app: AppHandle,
+    id: String,
+    database: State<'_, crate::state::OptionKeyDatabase>,
+) -> Result<(), String> {
+    let pool = database.pool();
+
+    let audio_path: Option<String> = sqlx::query_scalar(
+        "SELECT audio_path FROM meetings WHERE id = ?1",
+    )
+    .bind(&id)
+    .fetch_optional(&pool)
+    .await
+    .map_err(|err| err.to_string())?;
+
+    if let Some(path) = audio_path {
+        let file_path = PathBuf::from(&path);
+        if let Err(err) = crate::system::meeting_audio_store::delete_meeting_audio_file(&app, &file_path) {
+            eprintln!("Failed to delete meeting audio file for {id}: {err}");
+        }
+    }
+
+    crate::db::meeting_queries::delete_meeting(pool, &id)
+        .await
+        .map_err(|err| err.to_string())
+}
+
+#[tauri::command]
+pub async fn meeting_segment_list(
+    meeting_id: String,
+    database: State<'_, crate::state::OptionKeyDatabase>,
+) -> Result<Vec<crate::domain::MeetingSegment>, String> {
+    crate::db::meeting_queries::fetch_meeting_segments(database.pool(), &meeting_id)
+        .await
+        .map_err(|err| err.to_string())
+}
+
+#[tauri::command]
+pub async fn meeting_segments_create_batch(
+    segments: Vec<crate::domain::MeetingSegment>,
+    database: State<'_, crate::state::OptionKeyDatabase>,
+) -> Result<Vec<crate::domain::MeetingSegment>, String> {
+    crate::db::meeting_queries::insert_meeting_segments(database.pool(), &segments)
+        .await
+        .map_err(|err| err.to_string())
+}
+
+#[tauri::command]
+pub async fn meeting_segment_rename_speaker(
+    meeting_id: String,
+    speaker_id: String,
+    new_name: String,
+    database: State<'_, crate::state::OptionKeyDatabase>,
+) -> Result<(), String> {
+    crate::db::meeting_queries::update_meeting_segment_speaker(
+        database.pool(),
+        &meeting_id,
+        &speaker_id,
+        &new_name,
+    )
+    .await
+    .map_err(|err| err.to_string())
+}
+
+#[tauri::command]
+pub async fn meeting_start_audio_writer(
+    app: AppHandle,
+    meeting_id: String,
+    sample_rate: u32,
+    writer_state: State<'_, crate::system::meeting_audio_store::MeetingAudioWriterState>,
+) -> Result<(), String> {
+    if sample_rate == 0 {
+        return Err("Sample rate must be greater than zero".to_string());
+    }
+
+    let path = crate::system::meeting_audio_store::meeting_audio_path_for(&app, &meeting_id)
+        .map_err(|err| err.to_string())?;
+
+    let writer = crate::system::meeting_audio_store::MeetingWavWriter::create(path, sample_rate)
+        .map_err(|err| err.to_string())?;
+
+    let mut guard = writer_state.writer.lock().map_err(|err| err.to_string())?;
+    if guard.is_some() {
+        return Err("A meeting audio writer is already active".to_string());
+    }
+    *guard = Some(writer);
+
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn meeting_append_audio_chunk(
+    samples: Vec<f32>,
+    writer_state: State<'_, crate::system::meeting_audio_store::MeetingAudioWriterState>,
+) -> Result<(), String> {
+    let mut guard = writer_state.writer.lock().map_err(|err| err.to_string())?;
+    let writer = guard
+        .as_mut()
+        .ok_or_else(|| "No active meeting audio writer".to_string())?;
+
+    writer
+        .append_samples(&samples)
+        .map_err(|err| err.to_string())
+}
+
+#[tauri::command]
+pub async fn meeting_finalize_audio_writer(
+    writer_state: State<'_, crate::system::meeting_audio_store::MeetingAudioWriterState>,
+) -> Result<crate::system::meeting_audio_store::MeetingAudioResult, String> {
+    let mut guard = writer_state.writer.lock().map_err(|err| err.to_string())?;
+    let mut writer = guard
+        .take()
+        .ok_or_else(|| "No active meeting audio writer to finalize".to_string())?;
+
+    writer.finalize().map_err(|err| err.to_string())
+}
+
+#[tauri::command]
+pub async fn meeting_audio_load(
+    app: AppHandle,
+    meeting_id: String,
+    database: State<'_, crate::state::OptionKeyDatabase>,
+) -> Result<TranscriptionAudioData, String> {
+    let pool = database.pool();
+
+    let audio_path: Option<String> = sqlx::query_scalar(
+        "SELECT audio_path FROM meetings WHERE id = ?1",
+    )
+    .bind(&meeting_id)
+    .fetch_optional(&pool)
+    .await
+    .map_err(|err| err.to_string())?;
+
+    let audio_path = audio_path
+        .ok_or_else(|| "No audio file available for this meeting".to_string())?;
+
+    let audio_dir = std::fs::canonicalize(
+        crate::system::meeting_audio_store::meeting_audio_dir(&app).map_err(|err| err.to_string())?,
+    )
+    .map_err(|err| err.to_string())?;
+    let audio_path_buf = std::fs::canonicalize(PathBuf::from(&audio_path))
+        .map_err(|_| "Invalid meeting audio file path".to_string())?;
+
+    if !audio_path_buf.starts_with(&audio_dir) {
+        return Err("Meeting audio path is outside the managed directory".to_string());
+    }
+
+    let (samples, sample_rate) = tauri::async_runtime::spawn_blocking(move || {
+        crate::system::audio_store::load_audio_samples(&audio_path_buf)
+            .map_err(|err| err.to_string())
+    })
+    .await
+    .map_err(|err| err.to_string())??;
+
+    Ok(TranscriptionAudioData {
+        samples,
+        sample_rate,
+    })
 }
 
 #[tauri::command]

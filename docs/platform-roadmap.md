@@ -1,7 +1,7 @@
 # OSVoice Platform Roadmap
 
-> Last updated: 2026-02-08
-> Branch: `feature/phase-1-ai-chat`
+> Last updated: 2026-02-16
+> Branch: `feature/phase-2-meetings`
 > Reference: `docs/gap-analysis-highlight-ai.md`
 
 ---
@@ -43,6 +43,7 @@ The roadmap evolves OSVoice from a dictation tool into a **full AI productivity 
 | OpenRouter LLM | Done | 100+ models, provider routing |
 | Ollama (local) | Done | User-configurable, fully offline |
 | Cloud LLM | Done | Firebase function proxy |
+| LLM provider shared utils | Done | `openai-compat.utils.ts`: deduplicated ~520 lines across 5 OpenAI-compatible providers (contentToString, buildTextMessages, buildChatMessages, accumulateStream) |
 | Tone-based prompts | Done | Custom prompt templates with {transcript} |
 | App-specific tones | Done | Different tone per app target |
 | Smart formatting | Done | Email, list, paragraph detection |

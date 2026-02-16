@@ -1,11 +1,14 @@
 import OpenAI, { toFile } from "openai";
-import {
-  ChatCompletionContentPart,
-  ChatCompletionMessageParam,
-} from "openai/resources/chat/completions";
+import type { ChatCompletionMessageParam } from "openai/resources/chat/completions";
 import { retry } from "@repo/utilities/src/async";
 import { countWords } from "@repo/utilities/src/string";
 import type { JsonResponse } from "@repo/types";
+import {
+  contentToString,
+  buildTextMessages,
+  buildChatMessages,
+  accumulateStream,
+} from "./openai-compat.utils";
 
 export const OPENAI_GENERATE_TEXT_MODELS = [
   "gpt-4o",
@@ -19,28 +22,6 @@ export type OpenAIGenerateTextModel =
 export const OPENAI_TRANSCRIPTION_MODELS = ["whisper-1"] as const;
 export type OpenAITranscriptionModel =
   (typeof OPENAI_TRANSCRIPTION_MODELS)[number];
-
-const contentToString = (
-  content: string | ChatCompletionContentPart[] | null | undefined,
-): string => {
-  if (!content) {
-    return "";
-  }
-
-  if (typeof content === "string") {
-    return content;
-  }
-
-  return content
-    .map((part) => {
-      if (part.type === "text") {
-        return part.text ?? "";
-      }
-      return "";
-    })
-    .join("")
-    .trim();
-};
 
 const createClient = (
   apiKey: string,
@@ -133,21 +114,7 @@ export const openaiGenerateTextResponse = async ({
     fn: async () => {
       const client = createClient(apiKey, baseUrl, customFetch);
 
-      const messages: ChatCompletionMessageParam[] = [];
-      if (system) {
-        messages.push({ role: "system", content: system });
-      }
-
-      const userParts: ChatCompletionContentPart[] = [];
-      for (const url of imageUrls) {
-        userParts.push({
-          type: "image_url",
-          image_url: { url },
-        });
-      }
-
-      userParts.push({ type: "text", text: prompt });
-      messages.push({ role: "user", content: userParts });
+      const messages = buildTextMessages({ system, prompt, imageUrls });
 
       const response = await client.chat.completions.create({
         messages,
@@ -209,13 +176,7 @@ export const openaiGenerateChatResponse = async ({
     fn: async () => {
       const client = createClient(apiKey, baseUrl, customFetch);
 
-      const chatMessages: ChatCompletionMessageParam[] = [];
-      if (system) {
-        chatMessages.push({ role: "system", content: system });
-      }
-      for (const msg of messages) {
-        chatMessages.push({ role: msg.role, content: msg.content });
-      }
+      const chatMessages = buildChatMessages({ system, messages });
 
       const response = await client.chat.completions.create({
         messages: chatMessages,
@@ -242,6 +203,54 @@ export const openaiGenerateChatResponse = async ({
       };
     },
   });
+};
+
+export type OpenAIStreamChatArgs = {
+  apiKey: string;
+  baseUrl?: string;
+  model?: string;
+  system?: string;
+  messages: { role: "user" | "assistant"; content: string }[];
+  onChunk: (delta: string) => void;
+  customFetch?: typeof globalThis.fetch;
+};
+
+export const openaiStreamChatResponse = async ({
+  apiKey,
+  baseUrl,
+  model = "gpt-4o-mini",
+  system,
+  messages,
+  onChunk,
+  customFetch,
+}: OpenAIStreamChatArgs): Promise<OpenAIGenerateResponseOutput> => {
+  const client = createClient(apiKey, baseUrl, customFetch);
+
+  const chatMessages = buildChatMessages({ system, messages });
+
+  const stream = await client.chat.completions.create({
+    messages: chatMessages,
+    model,
+    temperature: 1,
+    max_completion_tokens: 1024,
+    top_p: 1,
+    stream: true,
+    stream_options: { include_usage: true },
+  });
+
+  const { fullContent, tokensUsed } = await accumulateStream({
+    stream,
+    onChunk,
+  });
+
+  if (!fullContent) {
+    throw new Error("No response from OpenAI");
+  }
+
+  return {
+    text: fullContent,
+    tokensUsed: tokensUsed || countWords(fullContent),
+  };
 };
 
 export type OpenAITestIntegrationArgs = {

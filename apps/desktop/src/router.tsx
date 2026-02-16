@@ -15,6 +15,7 @@ import StylingPage from "./components/styling/StylingPage.tsx";
 import StatsPage from "./components/stats/StatsPage.tsx";
 import AppsPage from "./components/apps/AppsPage.tsx";
 import ChatPage from "./components/chat/ChatPage.tsx";
+import MeetingsPage from "./components/meetings/MeetingsPage.tsx";
 import WelcomePage from "./components/welcome/WelcomePage.tsx";
 import LoginPage from "./components/login/LoginPage.tsx";
 
@@ -109,6 +110,10 @@ export const router = createBrowserRouter([
               {
                 path: "chat",
                 element: <ChatPage />,
+              },
+              {
+                path: "meetings",
+                element: <MeetingsPage />,
               },
               {
                 path: "stats",

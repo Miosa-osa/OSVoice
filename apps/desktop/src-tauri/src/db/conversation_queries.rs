@@ -19,6 +19,7 @@ fn row_to_message(row: SqliteRow) -> Result<Message, sqlx::Error> {
         content: row.get::<String, _>("content"),
         model: row.try_get::<Option<String>, _>("model")?,
         tokens_used: row.try_get::<Option<i64>, _>("tokens_used")?,
+        context_json: row.try_get::<Option<String>, _>("context_json")?,
         created_at: row.get::<String, _>("created_at"),
     })
 }
@@ -89,7 +90,7 @@ pub async fn delete_conversation(pool: SqlitePool, id: &str) -> Result<(), sqlx:
 
 pub async fn insert_message(pool: SqlitePool, message: &Message) -> Result<Message, sqlx::Error> {
     sqlx::query(
-        "INSERT INTO messages (id, conversation_id, role, content, model, tokens_used, created_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+        "INSERT INTO messages (id, conversation_id, role, content, model, tokens_used, context_json, created_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
     )
     .bind(&message.id)
     .bind(&message.conversation_id)
@@ -97,6 +98,7 @@ pub async fn insert_message(pool: SqlitePool, message: &Message) -> Result<Messa
     .bind(&message.content)
     .bind(message.model.as_deref())
     .bind(message.tokens_used)
+    .bind(message.context_json.as_deref())
     .bind(&message.created_at)
     .execute(&pool)
     .await?;
@@ -109,7 +111,7 @@ pub async fn fetch_messages(
     conversation_id: &str,
 ) -> Result<Vec<Message>, sqlx::Error> {
     let rows = sqlx::query(
-        "SELECT id, conversation_id, role, content, model, tokens_used, created_at FROM messages WHERE conversation_id = ?1 ORDER BY created_at ASC",
+        "SELECT id, conversation_id, role, content, model, tokens_used, context_json, created_at FROM messages WHERE conversation_id = ?1 ORDER BY created_at ASC",
     )
     .bind(conversation_id)
     .fetch_all(&pool)

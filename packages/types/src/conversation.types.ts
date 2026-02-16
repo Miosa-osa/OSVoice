@@ -14,6 +14,7 @@ export type Message = {
   content: string;
   model?: string | null;
   tokensUsed?: number | null;
+  contextJson?: string | null;
   createdAt: string;
 };
 

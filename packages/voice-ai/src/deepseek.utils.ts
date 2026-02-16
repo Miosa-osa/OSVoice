@@ -1,38 +1,21 @@
 import OpenAI from "openai";
-import {
+import type {
   ChatCompletionContentPart,
   ChatCompletionMessageParam,
 } from "openai/resources/chat/completions";
 import { retry } from "@repo/utilities/src/async";
 import { countWords } from "@repo/utilities/src/string";
 import type { JsonResponse } from "@repo/types";
+import {
+  contentToString,
+  buildChatMessages,
+  accumulateStream,
+} from "./openai-compat.utils";
 
 export const DEEPSEEK_MODELS = ["deepseek-chat", "deepseek-reasoner"] as const;
 export type DeepseekModel = (typeof DEEPSEEK_MODELS)[number];
 
 const DEEPSEEK_BASE_URL = "https://api.deepseek.com";
-
-const contentToString = (
-  content: string | ChatCompletionContentPart[] | null | undefined,
-): string => {
-  if (!content) {
-    return "";
-  }
-
-  if (typeof content === "string") {
-    return content;
-  }
-
-  return content
-    .map((part) => {
-      if (part.type === "text") {
-        return part.text ?? "";
-      }
-      return "";
-    })
-    .join("")
-    .trim();
-};
 
 const createClient = (apiKey: string) => {
   return new OpenAI({
@@ -127,13 +110,7 @@ export const deepseekGenerateChatResponse = async ({
     fn: async () => {
       const client = createClient(apiKey);
 
-      const chatMessages: ChatCompletionMessageParam[] = [];
-      if (system) {
-        chatMessages.push({ role: "system", content: system });
-      }
-      for (const msg of messages) {
-        chatMessages.push({ role: msg.role, content: msg.content });
-      }
+      const chatMessages = buildChatMessages({ system, messages });
 
       const response = await client.chat.completions.create({
         messages: chatMessages,
@@ -160,6 +137,49 @@ export const deepseekGenerateChatResponse = async ({
       };
     },
   });
+};
+
+export type DeepseekStreamChatArgs = {
+  apiKey: string;
+  model?: DeepseekModel;
+  system?: string;
+  messages: { role: "user" | "assistant"; content: string }[];
+  onChunk: (delta: string) => void;
+};
+
+export const deepseekStreamChatResponse = async ({
+  apiKey,
+  model = "deepseek-chat",
+  system,
+  messages,
+  onChunk,
+}: DeepseekStreamChatArgs): Promise<DeepseekGenerateResponseOutput> => {
+  const client = createClient(apiKey);
+
+  const chatMessages = buildChatMessages({ system, messages });
+
+  const stream = await client.chat.completions.create({
+    messages: chatMessages,
+    model,
+    temperature: 1,
+    max_tokens: 1024,
+    top_p: 1,
+    stream: true,
+  });
+
+  const { fullContent, tokensUsed } = await accumulateStream({
+    stream,
+    onChunk,
+  });
+
+  if (!fullContent) {
+    throw new Error("No response from DeepSeek");
+  }
+
+  return {
+    text: fullContent,
+    tokensUsed: tokensUsed || countWords(fullContent),
+  };
 };
 
 export type DeepseekTestIntegrationArgs = {

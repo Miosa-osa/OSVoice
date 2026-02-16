@@ -4,6 +4,7 @@ import {
   ClassOutlined,
   HistoryOutlined,
   HomeOutlined,
+  MicNoneOutlined,
   PaletteOutlined,
   SettingsOutlined,
 } from "@mui/icons-material";
@@ -31,6 +32,11 @@ const navItems: NavItem[] = [
     label: <FormattedMessage defaultMessage="Chat" />,
     path: "/dashboard/chat",
     icon: <AutoAwesomeOutlined />,
+  },
+  {
+    label: <FormattedMessage defaultMessage="Meetings" />,
+    path: "/dashboard/meetings",
+    icon: <MicNoneOutlined />,
   },
   {
     label: <FormattedMessage defaultMessage="History" />,
