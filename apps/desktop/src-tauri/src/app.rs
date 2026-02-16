@@ -65,6 +65,11 @@ pub fn build() -> tauri::Builder<tauri::Wry> {
             app.manage(crate::state::GoogleOAuthState::from_env());
             app.manage(crate::state::OverlayState::new());
 
+            match app.handle().path().app_data_dir() {
+                Ok(app_data_dir) => crate::system::crypto::init_crypto(&app_data_dir),
+                Err(err) => eprintln!("[app] Failed to resolve app data dir for crypto init: {err}"),
+            }
+
             #[cfg(desktop)]
             {
                 if std::env::args().any(|arg| arg == AUTOSTART_HIDDEN_ARG) {
@@ -94,6 +99,7 @@ pub fn build() -> tauri::Builder<tauri::Wry> {
 
                 app.manage(recorder);
                 app.manage(transcriber_state);
+                app.manage(crate::system::meeting_audio_store::MeetingAudioWriterState::new());
 
                 let pool_for_bg = pool.clone();
                 let app_handle_for_bg = app_handle.clone();
@@ -136,6 +142,9 @@ pub fn build() -> tauri::Builder<tauri::Wry> {
                 crate::overlay::ensure_agent_overlay_window(&app_handle)
                     .map_err(|err| -> Box<dyn std::error::Error> { Box::new(err) })?;
 
+                crate::overlay::ensure_quick_bar_overlay_window(&app_handle)
+                    .map_err(|err| -> Box<dyn std::error::Error> { Box::new(err) })?;
+
                 if let Some(pill_window) =
                     app_handle.get_webview_window(crate::overlay::PILL_OVERLAY_LABEL)
                 {
@@ -155,6 +164,12 @@ pub fn build() -> tauri::Builder<tauri::Wry> {
                 {
                     let _ = crate::platform::window::show_overlay_no_focus(&agent_window);
                     let _ = crate::platform::window::set_overlay_click_through(&agent_window, true);
+                }
+
+                if let Some(quick_bar_window) =
+                    app_handle.get_webview_window(crate::overlay::QUICK_BAR_OVERLAY_LABEL)
+                {
+                    let _ = quick_bar_window.show();
                 }
 
                 crate::overlay::start_cursor_follower(app_handle.clone());
@@ -230,6 +245,23 @@ pub fn build() -> tauri::Builder<tauri::Wry> {
             crate::commands::get_screen_context,
             crate::commands::get_selected_text,
             crate::commands::initialize_local_transcriber,
+            crate::commands::conversation_create,
+            crate::commands::conversation_list,
+            crate::commands::conversation_update,
+            crate::commands::conversation_delete,
+            crate::commands::message_create,
+            crate::commands::message_list,
+            crate::commands::meeting_create,
+            crate::commands::meeting_list,
+            crate::commands::meeting_update,
+            crate::commands::meeting_delete,
+            crate::commands::meeting_segment_list,
+            crate::commands::meeting_segments_create_batch,
+            crate::commands::meeting_segment_rename_speaker,
+            crate::commands::meeting_start_audio_writer,
+            crate::commands::meeting_append_audio_chunk,
+            crate::commands::meeting_finalize_audio_writer,
+            crate::commands::meeting_audio_load,
         ])
 }
 

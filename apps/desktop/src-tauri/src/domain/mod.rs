@@ -1,7 +1,9 @@
 pub mod api_key;
 pub mod app_target;
+pub mod conversation;
 pub mod hotkey;
 pub mod keyboard;
+pub mod meeting;
 pub mod monitor;
 pub mod overlay;
 pub mod permissions;
@@ -14,6 +16,8 @@ pub mod user;
 
 pub use api_key::{ApiKey, ApiKeyCreateRequest, ApiKeyUpdateRequest, ApiKeyView};
 pub use app_target::{AppTarget, EVT_REGISTER_CURRENT_APP};
+pub use conversation::{Conversation, Message};
+pub use meeting::{Meeting, MeetingSegment};
 pub use hotkey::Hotkey;
 pub use keyboard::{KeysHeldPayload, EVT_KEYS_HELD};
 pub use overlay::{OverlayPhase, OverlayPhasePayload, PillExpandedPayload, EVT_OVERLAY_PHASE, EVT_PILL_EXPANDED};

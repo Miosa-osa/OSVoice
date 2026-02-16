@@ -91,6 +91,108 @@ export const claudeGenerateTextResponse = async ({
   });
 };
 
+export type ClaudeGenerateChatArgs = {
+  apiKey: string;
+  model?: ClaudeModel;
+  system?: string;
+  messages: { role: "user" | "assistant"; content: string }[];
+};
+
+export const claudeGenerateChatResponse = async ({
+  apiKey,
+  model = "claude-sonnet-4-20250514",
+  system,
+  messages,
+}: ClaudeGenerateChatArgs): Promise<ClaudeGenerateResponseOutput> => {
+  return retry({
+    retries: 3,
+    fn: async () => {
+      const client = createClient(apiKey);
+
+      const chatMessages = messages.map((msg) => ({
+        role: msg.role as "user" | "assistant",
+        content: msg.content,
+      }));
+
+      const response = await client.messages.create({
+        model,
+        max_tokens: 1024,
+        system: system ?? undefined,
+        messages: chatMessages,
+      });
+
+      console.log("claude chat usage:", response.usage);
+
+      const textBlock = response.content.find((block) => block.type === "text");
+      if (!textBlock || textBlock.type !== "text") {
+        throw new Error("No text response from Claude");
+      }
+
+      const content = textBlock.text;
+      const tokensUsed =
+        (response.usage?.input_tokens ?? 0) +
+        (response.usage?.output_tokens ?? 0);
+
+      return {
+        text: content,
+        tokensUsed: tokensUsed || countWords(content),
+      };
+    },
+  });
+};
+
+export type ClaudeStreamChatArgs = {
+  apiKey: string;
+  model?: ClaudeModel;
+  system?: string;
+  messages: { role: "user" | "assistant"; content: string }[];
+  onChunk: (delta: string) => void;
+};
+
+export const claudeStreamChatResponse = async ({
+  apiKey,
+  model = "claude-sonnet-4-20250514",
+  system,
+  messages,
+  onChunk,
+}: ClaudeStreamChatArgs): Promise<ClaudeGenerateResponseOutput> => {
+  const client = createClient(apiKey);
+
+  const chatMessages = messages.map((msg) => ({
+    role: msg.role as "user" | "assistant",
+    content: msg.content,
+  }));
+
+  const stream = client.messages.stream({
+    model,
+    max_tokens: 1024,
+    system: system ?? undefined,
+    messages: chatMessages,
+  });
+
+  let fullContent = "";
+
+  stream.on("text", (text) => {
+    fullContent += text;
+    onChunk(text);
+  });
+
+  const finalMessage = await stream.finalMessage();
+
+  const tokensUsed =
+    (finalMessage.usage?.input_tokens ?? 0) +
+    (finalMessage.usage?.output_tokens ?? 0);
+
+  if (!fullContent) {
+    throw new Error("No response from Claude");
+  }
+
+  return {
+    text: fullContent,
+    tokensUsed: tokensUsed || countWords(fullContent),
+  };
+};
+
 export type ClaudeTestIntegrationArgs = {
   apiKey: string;
 };

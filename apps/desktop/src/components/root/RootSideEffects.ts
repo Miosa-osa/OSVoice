@@ -75,6 +75,7 @@ import {
   getMyPreferredMicrophone,
   getTranscriptionPrefs,
 } from "../../utils/user.utils";
+import { router } from "../../router";
 import {
   consumeSurfaceWindowFlag,
   setTrayTitle,
@@ -630,6 +631,24 @@ export const RootSideEffects = () => {
 
   useTauriListen<void>("on-click-dictate", () => {
     debouncedToggle("dictation", dictationController);
+  });
+
+  useTauriListen<{ query: string }>("quick-bar-query", async (payload) => {
+    produceAppState((draft) => {
+      draft.chat.pendingQuickBarQuery = payload.query;
+    });
+    await surfaceMainWindow();
+    router.navigate("/dashboard/chat");
+  });
+
+  useTauriListen<void>("quick-bar-open-settings", async () => {
+    await surfaceMainWindow();
+    router.navigate("/dashboard/settings");
+  });
+
+  useTauriListen<void>("quick-bar-open-chat", async () => {
+    await surfaceMainWindow();
+    router.navigate("/dashboard/chat");
   });
 
   const trayLanguageCode = useAppStore((state) => {

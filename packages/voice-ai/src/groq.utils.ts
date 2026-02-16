@@ -1,11 +1,13 @@
 import Groq, { toFile } from "groq-sdk/index";
-import {
-  ChatCompletionContentPart,
-  ChatCompletionMessageParam,
-} from "groq-sdk/resources/chat/completions";
+import type { ChatCompletionMessageParam } from "groq-sdk/resources/chat/completions";
 import { retry } from "@repo/utilities/src/async";
 import { countWords } from "@repo/utilities/src/string";
 import type { JsonResponse } from "@repo/types";
+import {
+  contentToString,
+  buildTextMessages,
+  buildChatMessages,
+} from "./openai-compat.utils";
 
 export const GENERATE_TEXT_MODELS = [
   "meta-llama/llama-4-scout-17b-16e-instruct",
@@ -16,28 +18,6 @@ export type GenerateTextModel = (typeof GENERATE_TEXT_MODELS)[number];
 
 export const TRANSCRIPTION_MODELS = ["whisper-large-v3-turbo"] as const;
 export type TranscriptionModel = (typeof TRANSCRIPTION_MODELS)[number];
-
-const contentToString = (
-  content: string | ChatCompletionContentPart[] | null | undefined,
-): string => {
-  if (!content) {
-    return "";
-  }
-
-  if (typeof content === "string") {
-    return content;
-  }
-
-  return content
-    .map((part) => {
-      if (part.type === "text") {
-        return part.text ?? "";
-      }
-      return "";
-    })
-    .join("")
-    .trim();
-};
 
 const createClient = (apiKey: string) => {
   // `dangerouslyAllowBrowser` is needed because this runs on a desktop tauri app.
@@ -117,21 +97,7 @@ export const groqGenerateTextResponse = async ({
     fn: async () => {
       const client = createClient(apiKey);
 
-      const messages: ChatCompletionMessageParam[] = [];
-      if (system) {
-        messages.push({ role: "system", content: system });
-      }
-
-      const userParts: ChatCompletionContentPart[] = [];
-      for (const url of imageUrls) {
-        userParts.push({
-          type: "image_url",
-          image_url: { url },
-        });
-      }
-
-      userParts.push({ type: "text", text: prompt });
-      messages.push({ role: "user", content: userParts });
+      const messages = buildTextMessages({ system, prompt, imageUrls });
 
       const response = await client.chat.completions.create({
         messages,
@@ -168,6 +134,101 @@ export const groqGenerateTextResponse = async ({
       };
     },
   });
+};
+
+export type GroqGenerateChatArgs = {
+  apiKey: string;
+  model?: GenerateTextModel;
+  system?: string;
+  messages: { role: "user" | "assistant"; content: string }[];
+};
+
+export const groqGenerateChatResponse = async ({
+  apiKey,
+  model = "meta-llama/llama-4-scout-17b-16e-instruct",
+  system,
+  messages,
+}: GroqGenerateChatArgs): Promise<GroqGenerateResponseOutput> => {
+  return retry({
+    retries: 3,
+    fn: async () => {
+      const client = createClient(apiKey);
+
+      const chatMessages = buildChatMessages({ system, messages });
+
+      const response = await client.chat.completions.create({
+        messages: chatMessages,
+        model,
+        temperature: 1,
+        max_completion_tokens: 1024,
+        top_p: 1,
+      });
+
+      console.log("groq chat usage:", response.usage);
+      if (!response.choices || response.choices.length === 0) {
+        throw new Error("No response from Groq");
+      }
+
+      const result = response.choices[0].message.content;
+      if (!result) {
+        throw new Error("Content is empty");
+      }
+
+      const content = contentToString(result);
+      return {
+        text: content,
+        tokensUsed: response.usage?.total_tokens ?? countWords(content),
+      };
+    },
+  });
+};
+
+export type GroqStreamChatArgs = {
+  apiKey: string;
+  model?: GenerateTextModel;
+  system?: string;
+  messages: { role: "user" | "assistant"; content: string }[];
+  onChunk: (delta: string) => void;
+};
+
+export const groqStreamChatResponse = async ({
+  apiKey,
+  model = "meta-llama/llama-4-scout-17b-16e-instruct",
+  system,
+  messages,
+  onChunk,
+}: GroqStreamChatArgs): Promise<GroqGenerateResponseOutput> => {
+  const client = createClient(apiKey);
+
+  const chatMessages = buildChatMessages({ system, messages });
+
+  const stream = await client.chat.completions.create({
+    messages: chatMessages,
+    model,
+    temperature: 1,
+    max_completion_tokens: 1024,
+    top_p: 1,
+    stream: true,
+  });
+
+  let fullContent = "";
+
+  for await (const chunk of stream) {
+    const delta = chunk.choices?.[0]?.delta?.content;
+    if (delta) {
+      fullContent += delta;
+      onChunk(delta);
+    }
+  }
+
+  if (!fullContent) {
+    throw new Error("No response from Groq");
+  }
+
+  return {
+    text: fullContent,
+    tokensUsed: countWords(fullContent),
+  };
 };
 
 export type GroqTestIntegrationArgs = {

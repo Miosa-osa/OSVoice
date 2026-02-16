@@ -49,6 +49,12 @@ import {
   LocalTranscriptionRepo,
 } from "./transcription.repo";
 import { BaseUserRepo, CloudUserRepo, LocalUserRepo } from "./user.repo";
+import {
+  BaseConversationRepo,
+  LocalConversationRepo,
+} from "./conversation.repo";
+import { BaseMeetingRepo, LocalMeetingRepo } from "./meeting.repo";
+import { AssemblyAIDiarizeRepo, BaseDiarizeRepo } from "./diarize.repo";
 
 const shouldUseCloud = () => getHasCloudAccess(getAppState());
 
@@ -86,6 +92,23 @@ export const getApiKeyRepo = (): BaseApiKeyRepo => {
 
 export const getToneRepo = (): BaseToneRepo => {
   return new LocalToneRepo();
+};
+
+export const getConversationRepo = (): BaseConversationRepo => {
+  return new LocalConversationRepo();
+};
+
+export const getMeetingRepo = (): BaseMeetingRepo => {
+  return new LocalMeetingRepo();
+};
+
+export const getDiarizeRepo = (): BaseDiarizeRepo | null => {
+  const state = getAppState();
+  const assemblyAiKey = Object.values(state.apiKeyById).find(
+    (k) => k.provider === "assemblyai" && k.keyFull,
+  );
+  if (!assemblyAiKey?.keyFull) return null;
+  return new AssemblyAIDiarizeRepo(assemblyAiKey.keyFull);
 };
 
 export const getStorageRepo = (): BaseStorageRepo => {

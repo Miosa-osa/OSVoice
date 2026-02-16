@@ -24,6 +24,10 @@ pub const AGENT_OVERLAY_HEIGHT: f64 = 632.0;
 pub const AGENT_OVERLAY_LEFT_OFFSET: f64 = 16.0;
 pub const AGENT_OVERLAY_TOP_OFFSET: f64 = 16.0;
 
+pub const QUICK_BAR_OVERLAY_LABEL: &str = "quick-bar-overlay";
+pub const QUICK_BAR_OVERLAY_WIDTH: f64 = 320.0;
+pub const QUICK_BAR_OVERLAY_HEIGHT: f64 = 250.0;
+
 const CURSOR_POLL_INTERVAL_MS: u64 = 60;
 const DEFAULT_SCREEN_WIDTH: f64 = 1920.0;
 const DEFAULT_SCREEN_HEIGHT: f64 = 1080.0;
@@ -188,6 +192,45 @@ pub fn ensure_agent_overlay_window(app: &tauri::AppHandle) -> tauri::Result<()> 
     if let Err(err) = crate::platform::window::configure_overlay_non_activating(&window) {
         eprintln!("Failed to configure {AGENT_OVERLAY_LABEL} as non-activating: {err}");
     }
+
+    Ok(())
+}
+
+pub fn ensure_quick_bar_overlay_window(app: &tauri::AppHandle) -> tauri::Result<()> {
+    if app.get_webview_window(QUICK_BAR_OVERLAY_LABEL).is_some() {
+        return Ok(());
+    }
+
+    let (screen_width, screen_height) = get_primary_screen_size(app);
+
+    let url = build_overlay_webview_url(app, "quick-bar-overlay")?;
+
+    let x = (screen_width - QUICK_BAR_OVERLAY_WIDTH) / 2.0;
+    let y = screen_height * 0.85 - (QUICK_BAR_OVERLAY_HEIGHT - 44.0);
+
+    let builder = {
+        let builder = WebviewWindowBuilder::new(app, QUICK_BAR_OVERLAY_LABEL, url)
+            .decorations(false)
+            .always_on_top(true)
+            .transparent(true)
+            .skip_taskbar(true)
+            .resizable(false)
+            .shadow(false)
+            .focusable(true)
+            .inner_size(QUICK_BAR_OVERLAY_WIDTH, QUICK_BAR_OVERLAY_HEIGHT)
+            .position(x, y);
+
+        #[cfg(not(target_os = "linux"))]
+        {
+            builder.visible(false)
+        }
+        #[cfg(target_os = "linux")]
+        {
+            builder
+        }
+    };
+
+    builder.build()?;
 
     Ok(())
 }

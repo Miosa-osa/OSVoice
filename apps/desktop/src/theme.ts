@@ -23,6 +23,9 @@ export const theme = createTheme({
         level1: "#F5F5F5",
         level2: "#E0E0E0",
         level3: "#D0D0D0",
+
+        glass: "rgba(255, 255, 255, 0.72)",
+        glassBorder: "rgba(0, 0, 0, 0.06)",
       },
     },
     dark: {
@@ -42,6 +45,9 @@ export const theme = createTheme({
         level1: "#1C1C1C",
         level2: "#2D2D2D",
         level3: "#3E3E3E",
+
+        glass: "rgba(30, 30, 30, 0.72)",
+        glassBorder: "rgba(255, 255, 255, 0.08)",
       },
     },
   },
@@ -92,7 +98,10 @@ export const theme = createTheme({
     MuiDialog: {
       styleOverrides: {
         paper: ({ theme }) => ({
-          backgroundColor: theme.vars.palette.level0,
+          backgroundColor: theme.vars.palette.glass,
+          backdropFilter: "blur(20px)",
+          WebkitBackdropFilter: "blur(20px)",
+          border: `1px solid ${theme.vars.palette.glassBorder}`,
         }),
       },
     },
@@ -177,7 +186,10 @@ export const theme = createTheme({
     MuiPopover: {
       styleOverrides: {
         paper: ({ theme }) => ({
-          backgroundColor: theme.vars.palette.level1,
+          backgroundColor: theme.vars.palette.glass,
+          backdropFilter: "blur(20px)",
+          WebkitBackdropFilter: "blur(20px)",
+          border: `1px solid ${theme.vars.palette.glassBorder}`,
           boxShadow: `0px 8px 16px ${theme.vars?.palette.shadow}`,
         }),
       },
@@ -280,6 +292,15 @@ export const theme = createTheme({
           props: { variant: "flat" },
           style: ({ theme }) => ({
             backgroundColor: theme.vars.palette.level1,
+          }),
+        },
+        {
+          props: { variant: "glass" },
+          style: ({ theme }) => ({
+            backgroundColor: theme.vars.palette.glass,
+            backdropFilter: "blur(20px)",
+            WebkitBackdropFilter: "blur(20px)",
+            border: `1px solid ${theme.vars.palette.glassBorder}`,
           }),
         },
       ],

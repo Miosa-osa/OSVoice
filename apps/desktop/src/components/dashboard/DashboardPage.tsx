@@ -21,6 +21,10 @@ export default function DashboardPage() {
             display: { xs: "none", sm: "flex" },
             flexDirection: "column",
             width: 224,
+            backgroundColor: "var(--app-palette-glass)",
+            backdropFilter: "blur(20px)",
+            WebkitBackdropFilter: "blur(20px)",
+            borderRight: "1px solid var(--app-palette-glassBorder)",
           }}
         >
           <DashboardMenu />

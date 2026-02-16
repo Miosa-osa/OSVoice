@@ -1,19 +1,38 @@
 import { invokeHandler, type CloudModel } from "@repo/functions";
-import { JsonResponse, Nullable, OpenRouterProviderRouting } from "@repo/types";
 import {
+  ChatMessage,
+  JsonResponse,
+  Nullable,
+  OpenRouterProviderRouting,
+} from "@repo/types";
+import {
+  azureOpenAIGenerateChat,
   azureOpenAIGenerateText,
+  azureOpenAIStreamChat,
+  claudeGenerateChatResponse,
   claudeGenerateTextResponse,
+  claudeStreamChatResponse,
   ClaudeModel,
+  deepseekGenerateChatResponse,
   deepseekGenerateTextResponse,
+  deepseekStreamChatResponse,
   DeepseekModel,
+  geminiGenerateChatResponse,
   geminiGenerateTextResponse,
+  geminiStreamChatResponse,
   GeminiGenerateTextModel,
   GenerateTextModel,
+  groqGenerateChatResponse,
   groqGenerateTextResponse,
+  groqStreamChatResponse,
+  openaiGenerateChatResponse,
   OpenAIGenerateTextModel,
   openaiGenerateTextResponse,
+  openaiStreamChatResponse,
   OPENROUTER_DEFAULT_MODEL,
+  openrouterGenerateChatResponse,
   openrouterGenerateTextResponse,
+  openrouterStreamChatResponse,
 } from "@repo/voice-ai";
 import { fetch as tauriFetch } from "@tauri-apps/plugin-http";
 import { PostProcessingMode } from "../types/ai.types";
@@ -23,6 +42,17 @@ export type GenerateTextInput = {
   system?: Nullable<string>;
   prompt: string;
   jsonResponse?: JsonResponse;
+};
+
+export type GenerateChatInput = {
+  system?: Nullable<string>;
+  messages: ChatMessage[];
+};
+
+export type GenerateChatStreamInput = {
+  system?: Nullable<string>;
+  messages: ChatMessage[];
+  onChunk: (delta: string) => void;
 };
 
 export type GenerateTextMetadata = {
@@ -37,6 +67,10 @@ export type GenerateTextOutput = {
 
 export abstract class BaseGenerateTextRepo extends BaseRepo {
   abstract generateText(input: GenerateTextInput): Promise<GenerateTextOutput>;
+  abstract generateChat(input: GenerateChatInput): Promise<GenerateTextOutput>;
+  abstract generateChatStream(
+    input: GenerateChatStreamInput,
+  ): Promise<GenerateTextOutput>;
 }
 
 export class CloudGenerateTextRepo extends BaseGenerateTextRepo {
@@ -62,6 +96,33 @@ export class CloudGenerateTextRepo extends BaseGenerateTextRepo {
       },
     };
   }
+
+  async generateChat(input: GenerateChatInput): Promise<GenerateTextOutput> {
+    const lastMessage = input.messages[input.messages.length - 1];
+    const contextMessages = input.messages.slice(0, -1);
+    const context = contextMessages
+      .map((m) => `${m.role === "user" ? "User" : "Assistant"}: ${m.content}`)
+      .join("\n\n");
+    const prompt = context
+      ? `${context}\n\nUser: ${lastMessage?.content ?? ""}`
+      : (lastMessage?.content ?? "");
+
+    return this.generateText({
+      system: input.system,
+      prompt,
+    });
+  }
+
+  async generateChatStream(
+    input: GenerateChatStreamInput,
+  ): Promise<GenerateTextOutput> {
+    const result = await this.generateChat({
+      system: input.system,
+      messages: input.messages,
+    });
+    input.onChunk(result.text);
+    return result;
+  }
 }
 
 export class GroqGenerateTextRepo extends BaseGenerateTextRepo {
@@ -83,6 +144,43 @@ export class GroqGenerateTextRepo extends BaseGenerateTextRepo {
       prompt: input.prompt,
       system: input.system ?? undefined,
       jsonResponse: input.jsonResponse,
+    });
+
+    return {
+      text: response.text,
+      metadata: {
+        postProcessingMode: "api",
+        inferenceDevice: "API • Groq",
+      },
+    };
+  }
+
+  async generateChat(input: GenerateChatInput): Promise<GenerateTextOutput> {
+    const response = await groqGenerateChatResponse({
+      apiKey: this.groqApiKey,
+      model: this.model,
+      system: input.system ?? undefined,
+      messages: input.messages,
+    });
+
+    return {
+      text: response.text,
+      metadata: {
+        postProcessingMode: "api",
+        inferenceDevice: "API • Groq",
+      },
+    };
+  }
+
+  async generateChatStream(
+    input: GenerateChatStreamInput,
+  ): Promise<GenerateTextOutput> {
+    const response = await groqStreamChatResponse({
+      apiKey: this.groqApiKey,
+      model: this.model,
+      system: input.system ?? undefined,
+      messages: input.messages,
+      onChunk: input.onChunk,
     });
 
     return {
@@ -122,6 +220,43 @@ export class OpenAIGenerateTextRepo extends BaseGenerateTextRepo {
       },
     };
   }
+
+  async generateChat(input: GenerateChatInput): Promise<GenerateTextOutput> {
+    const response = await openaiGenerateChatResponse({
+      apiKey: this.openaiApiKey,
+      model: this.model,
+      system: input.system ?? undefined,
+      messages: input.messages,
+    });
+
+    return {
+      text: response.text,
+      metadata: {
+        postProcessingMode: "api",
+        inferenceDevice: "API • OpenAI",
+      },
+    };
+  }
+
+  async generateChatStream(
+    input: GenerateChatStreamInput,
+  ): Promise<GenerateTextOutput> {
+    const response = await openaiStreamChatResponse({
+      apiKey: this.openaiApiKey,
+      model: this.model,
+      system: input.system ?? undefined,
+      messages: input.messages,
+      onChunk: input.onChunk,
+    });
+
+    return {
+      text: response.text,
+      metadata: {
+        postProcessingMode: "api",
+        inferenceDevice: "API • OpenAI",
+      },
+    };
+  }
 }
 
 export class OllamaGenerateTextRepo extends BaseGenerateTextRepo {
@@ -144,6 +279,47 @@ export class OllamaGenerateTextRepo extends BaseGenerateTextRepo {
       prompt: input.prompt,
       system: input.system ?? undefined,
       jsonResponse: input.jsonResponse,
+      customFetch: tauriFetch,
+    });
+
+    return {
+      text: response.text,
+      metadata: {
+        postProcessingMode: "api",
+        inferenceDevice: "API • Ollama",
+      },
+    };
+  }
+
+  async generateChat(input: GenerateChatInput): Promise<GenerateTextOutput> {
+    const response = await openaiGenerateChatResponse({
+      baseUrl: this.ollamaUrl,
+      apiKey: this.apiKey,
+      model: this.model,
+      system: input.system ?? undefined,
+      messages: input.messages,
+      customFetch: tauriFetch,
+    });
+
+    return {
+      text: response.text,
+      metadata: {
+        postProcessingMode: "api",
+        inferenceDevice: "API • Ollama",
+      },
+    };
+  }
+
+  async generateChatStream(
+    input: GenerateChatStreamInput,
+  ): Promise<GenerateTextOutput> {
+    const response = await openaiStreamChatResponse({
+      baseUrl: this.ollamaUrl,
+      apiKey: this.apiKey,
+      model: this.model,
+      system: input.system ?? undefined,
+      messages: input.messages,
+      onChunk: input.onChunk,
       customFetch: tauriFetch,
     });
 
@@ -191,6 +367,45 @@ export class OpenRouterGenerateTextRepo extends BaseGenerateTextRepo {
       },
     };
   }
+
+  async generateChat(input: GenerateChatInput): Promise<GenerateTextOutput> {
+    const response = await openrouterGenerateChatResponse({
+      apiKey: this.apiKey,
+      model: this.model,
+      system: input.system ?? undefined,
+      messages: input.messages,
+      providerRouting: this.providerRouting,
+    });
+
+    return {
+      text: response.text,
+      metadata: {
+        postProcessingMode: "api",
+        inferenceDevice: "API • OpenRouter",
+      },
+    };
+  }
+
+  async generateChatStream(
+    input: GenerateChatStreamInput,
+  ): Promise<GenerateTextOutput> {
+    const response = await openrouterStreamChatResponse({
+      apiKey: this.apiKey,
+      model: this.model,
+      system: input.system ?? undefined,
+      messages: input.messages,
+      onChunk: input.onChunk,
+      providerRouting: this.providerRouting,
+    });
+
+    return {
+      text: response.text,
+      metadata: {
+        postProcessingMode: "api",
+        inferenceDevice: "API • OpenRouter",
+      },
+    };
+  }
 }
 
 export class AzureOpenAIGenerateTextRepo extends BaseGenerateTextRepo {
@@ -213,6 +428,45 @@ export class AzureOpenAIGenerateTextRepo extends BaseGenerateTextRepo {
       system: input.system ?? undefined,
       prompt: input.prompt,
       jsonResponse: input.jsonResponse,
+    });
+
+    return {
+      text: response.text,
+      metadata: {
+        postProcessingMode: "api",
+        inferenceDevice: "API • Azure OpenAI",
+      },
+    };
+  }
+
+  async generateChat(input: GenerateChatInput): Promise<GenerateTextOutput> {
+    const response = await azureOpenAIGenerateChat({
+      apiKey: this.apiKey,
+      endpoint: this.endpoint,
+      deploymentName: this.deploymentName,
+      system: input.system ?? undefined,
+      messages: input.messages,
+    });
+
+    return {
+      text: response.text,
+      metadata: {
+        postProcessingMode: "api",
+        inferenceDevice: "API • Azure OpenAI",
+      },
+    };
+  }
+
+  async generateChatStream(
+    input: GenerateChatStreamInput,
+  ): Promise<GenerateTextOutput> {
+    const response = await azureOpenAIStreamChat({
+      apiKey: this.apiKey,
+      endpoint: this.endpoint,
+      deploymentName: this.deploymentName,
+      system: input.system ?? undefined,
+      messages: input.messages,
+      onChunk: input.onChunk,
     });
 
     return {
@@ -252,6 +506,43 @@ export class DeepseekGenerateTextRepo extends BaseGenerateTextRepo {
       },
     };
   }
+
+  async generateChat(input: GenerateChatInput): Promise<GenerateTextOutput> {
+    const response = await deepseekGenerateChatResponse({
+      apiKey: this.apiKey,
+      model: this.model,
+      system: input.system ?? undefined,
+      messages: input.messages,
+    });
+
+    return {
+      text: response.text,
+      metadata: {
+        postProcessingMode: "api",
+        inferenceDevice: "API • DeepSeek",
+      },
+    };
+  }
+
+  async generateChatStream(
+    input: GenerateChatStreamInput,
+  ): Promise<GenerateTextOutput> {
+    const response = await deepseekStreamChatResponse({
+      apiKey: this.apiKey,
+      model: this.model,
+      system: input.system ?? undefined,
+      messages: input.messages,
+      onChunk: input.onChunk,
+    });
+
+    return {
+      text: response.text,
+      metadata: {
+        postProcessingMode: "api",
+        inferenceDevice: "API • DeepSeek",
+      },
+    };
+  }
 }
 
 export class GeminiGenerateTextRepo extends BaseGenerateTextRepo {
@@ -281,6 +572,43 @@ export class GeminiGenerateTextRepo extends BaseGenerateTextRepo {
       },
     };
   }
+
+  async generateChat(input: GenerateChatInput): Promise<GenerateTextOutput> {
+    const response = await geminiGenerateChatResponse({
+      apiKey: this.apiKey,
+      model: this.model,
+      system: input.system ?? undefined,
+      messages: input.messages,
+    });
+
+    return {
+      text: response.text,
+      metadata: {
+        postProcessingMode: "api",
+        inferenceDevice: "API • Gemini",
+      },
+    };
+  }
+
+  async generateChatStream(
+    input: GenerateChatStreamInput,
+  ): Promise<GenerateTextOutput> {
+    const response = await geminiStreamChatResponse({
+      apiKey: this.apiKey,
+      model: this.model,
+      system: input.system ?? undefined,
+      messages: input.messages,
+      onChunk: input.onChunk,
+    });
+
+    return {
+      text: response.text,
+      metadata: {
+        postProcessingMode: "api",
+        inferenceDevice: "API • Gemini",
+      },
+    };
+  }
 }
 
 export class ClaudeGenerateTextRepo extends BaseGenerateTextRepo {
@@ -300,6 +628,43 @@ export class ClaudeGenerateTextRepo extends BaseGenerateTextRepo {
       prompt: input.prompt,
       system: input.system ?? undefined,
       jsonResponse: input.jsonResponse,
+    });
+
+    return {
+      text: response.text,
+      metadata: {
+        postProcessingMode: "api",
+        inferenceDevice: "API • Claude",
+      },
+    };
+  }
+
+  async generateChat(input: GenerateChatInput): Promise<GenerateTextOutput> {
+    const response = await claudeGenerateChatResponse({
+      apiKey: this.apiKey,
+      model: this.model,
+      system: input.system ?? undefined,
+      messages: input.messages,
+    });
+
+    return {
+      text: response.text,
+      metadata: {
+        postProcessingMode: "api",
+        inferenceDevice: "API • Claude",
+      },
+    };
+  }
+
+  async generateChatStream(
+    input: GenerateChatStreamInput,
+  ): Promise<GenerateTextOutput> {
+    const response = await claudeStreamChatResponse({
+      apiKey: this.apiKey,
+      model: this.model,
+      system: input.system ?? undefined,
+      messages: input.messages,
+      onChunk: input.onChunk,
     });
 
     return {

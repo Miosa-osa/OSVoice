@@ -21,6 +21,7 @@ import ReactDOM from "react-dom/client";
 import { IntlProvider } from "react-intl";
 import { AgentOverlayRoot } from "./components/overlay/AgentOverlayRoot";
 import { PillOverlayRoot } from "./components/overlay/PillOverlayRoot";
+import { QuickBarOverlayRoot } from "./components/overlay/QuickBarOverlayRoot";
 import { ToastOverlayRoot } from "./components/overlay/ToastOverlayRoot";
 import { AppWithLoading } from "./components/root/AppWithLoading";
 import { SnackbarEmitter } from "./components/root/SnackbarEmitter";
@@ -90,6 +91,7 @@ const searchParams =
 const isPillOverlayWindow = searchParams?.get("pill-overlay") === "1";
 const isToastOverlayWindow = searchParams?.get("toast-overlay") === "1";
 const isAgentOverlayWindow = searchParams?.get("agent-overlay") === "1";
+const isQuickBarOverlayWindow = searchParams?.get("quick-bar-overlay") === "1";
 
 const rootElement = document.getElementById("root") as HTMLElement;
 
@@ -135,6 +137,12 @@ if (isPillOverlayWindow) {
   root.render(
     <Main>
       <AgentOverlayRoot />
+    </Main>,
+  );
+} else if (isQuickBarOverlayWindow) {
+  root.render(
+    <Main>
+      <QuickBarOverlayRoot />
     </Main>,
   );
 } else {

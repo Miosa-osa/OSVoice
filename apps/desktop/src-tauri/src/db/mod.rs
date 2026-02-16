@@ -1,6 +1,8 @@
 pub mod api_key_queries;
 pub mod app_target_queries;
+pub mod conversation_queries;
 pub mod hotkey_queries;
+pub mod meeting_queries;
 pub mod preferences_queries;
 pub mod term_queries;
 pub mod tone_queries;
@@ -88,6 +90,11 @@ pub const DICTATION_PILL_VISIBILITY_MIGRATION_SQL: &str =
 pub const TRANSCRIPTION_SANITIZED_TRANSCRIPT_MIGRATION_SQL: &str =
     include_str!("migrations/047_transcription_sanitized_transcript.sql");
 pub const USER_WPM_STATS_MIGRATION_SQL: &str = include_str!("migrations/048_user_wpm_stats.sql");
+pub const CONVERSATIONS_MIGRATION_SQL: &str = include_str!("migrations/049_conversations.sql");
+pub const PERFORMANCE_INDEXES_MIGRATION_SQL: &str =
+    include_str!("migrations/050_performance_indexes.sql");
+pub const MEETINGS_MIGRATION_SQL: &str = include_str!("migrations/051_meetings.sql");
+pub const MESSAGE_CONTEXT_MIGRATION_SQL: &str = include_str!("migrations/052_message_context.sql");
 
 pub fn migrations() -> Vec<tauri_plugin_sql::Migration> {
     vec![
@@ -377,6 +384,30 @@ pub fn migrations() -> Vec<tauri_plugin_sql::Migration> {
             version: 48,
             description: "add_user_wpm_stats",
             sql: USER_WPM_STATS_MIGRATION_SQL,
+            kind: tauri_plugin_sql::MigrationKind::Up,
+        },
+        tauri_plugin_sql::Migration {
+            version: 49,
+            description: "create_conversations_and_messages_tables",
+            sql: CONVERSATIONS_MIGRATION_SQL,
+            kind: tauri_plugin_sql::MigrationKind::Up,
+        },
+        tauri_plugin_sql::Migration {
+            version: 50,
+            description: "add_performance_indexes",
+            sql: PERFORMANCE_INDEXES_MIGRATION_SQL,
+            kind: tauri_plugin_sql::MigrationKind::Up,
+        },
+        tauri_plugin_sql::Migration {
+            version: 51,
+            description: "create_meetings_and_segments_tables",
+            sql: MEETINGS_MIGRATION_SQL,
+            kind: tauri_plugin_sql::MigrationKind::Up,
+        },
+        tauri_plugin_sql::Migration {
+            version: 52,
+            description: "add_message_context_json",
+            sql: MESSAGE_CONTEXT_MIGRATION_SQL,
             kind: tauri_plugin_sql::MigrationKind::Up,
         },
     ]
