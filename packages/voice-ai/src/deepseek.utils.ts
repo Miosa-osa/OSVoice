@@ -109,6 +109,59 @@ export const deepseekGenerateTextResponse = async ({
   });
 };
 
+export type DeepseekGenerateChatArgs = {
+  apiKey: string;
+  model?: DeepseekModel;
+  system?: string;
+  messages: { role: "user" | "assistant"; content: string }[];
+};
+
+export const deepseekGenerateChatResponse = async ({
+  apiKey,
+  model = "deepseek-chat",
+  system,
+  messages,
+}: DeepseekGenerateChatArgs): Promise<DeepseekGenerateResponseOutput> => {
+  return retry({
+    retries: 3,
+    fn: async () => {
+      const client = createClient(apiKey);
+
+      const chatMessages: ChatCompletionMessageParam[] = [];
+      if (system) {
+        chatMessages.push({ role: "system", content: system });
+      }
+      for (const msg of messages) {
+        chatMessages.push({ role: msg.role, content: msg.content });
+      }
+
+      const response = await client.chat.completions.create({
+        messages: chatMessages,
+        model,
+        temperature: 1,
+        max_tokens: 1024,
+        top_p: 1,
+      });
+
+      console.log("deepseek chat usage:", response.usage);
+      if (!response.choices || response.choices.length === 0) {
+        throw new Error("No response from DeepSeek");
+      }
+
+      const result = response.choices[0].message.content;
+      if (!result) {
+        throw new Error("Content is empty");
+      }
+
+      const content = contentToString(result);
+      return {
+        text: content,
+        tokensUsed: response.usage?.total_tokens ?? countWords(content),
+      };
+    },
+  });
+};
+
 export type DeepseekTestIntegrationArgs = {
   apiKey: string;
 };

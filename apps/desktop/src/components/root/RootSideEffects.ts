@@ -641,6 +641,16 @@ export const RootSideEffects = () => {
     router.navigate("/dashboard/chat");
   });
 
+  useTauriListen<void>("quick-bar-open-settings", async () => {
+    await surfaceMainWindow();
+    router.navigate("/dashboard/settings");
+  });
+
+  useTauriListen<void>("quick-bar-open-chat", async () => {
+    await surfaceMainWindow();
+    router.navigate("/dashboard/chat");
+  });
+
   const trayLanguageCode = useAppStore((state) => {
     if (!state.settings.languageSwitch.enabled) {
       return null;

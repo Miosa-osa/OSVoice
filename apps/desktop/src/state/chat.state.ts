@@ -4,8 +4,7 @@ export type ChatState = {
   activeConversationId: Nullable<string>;
   conversationIds: string[];
   messageIds: string[];
-  isStreaming: boolean;
-  streamingContent: string;
+  isLoading: boolean;
   pendingQuickBarQuery: Nullable<string>;
 };
 
@@ -13,7 +12,6 @@ export const INITIAL_CHAT_STATE: ChatState = {
   activeConversationId: null,
   conversationIds: [],
   messageIds: [],
-  isStreaming: false,
-  streamingContent: "",
+  isLoading: false,
   pendingQuickBarQuery: null,
 };

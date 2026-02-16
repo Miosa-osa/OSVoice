@@ -65,6 +65,11 @@ pub fn build() -> tauri::Builder<tauri::Wry> {
             app.manage(crate::state::GoogleOAuthState::from_env());
             app.manage(crate::state::OverlayState::new());
 
+            match app.handle().path().app_data_dir() {
+                Ok(app_data_dir) => crate::system::crypto::init_crypto(&app_data_dir),
+                Err(err) => eprintln!("[app] Failed to resolve app data dir for crypto init: {err}"),
+            }
+
             #[cfg(desktop)]
             {
                 if std::env::args().any(|arg| arg == AUTOSTART_HIDDEN_ARG) {
@@ -163,7 +168,7 @@ pub fn build() -> tauri::Builder<tauri::Wry> {
                 if let Some(quick_bar_window) =
                     app_handle.get_webview_window(crate::overlay::QUICK_BAR_OVERLAY_LABEL)
                 {
-                    let _ = crate::platform::window::show_overlay_no_focus(&quick_bar_window);
+                    let _ = quick_bar_window.show();
                 }
 
                 crate::overlay::start_cursor_follower(app_handle.clone());

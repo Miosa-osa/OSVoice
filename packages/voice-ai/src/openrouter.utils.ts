@@ -214,6 +214,74 @@ export const openrouterGenerateTextResponse = async ({
 };
 
 // ============================================================================
+// Generate Chat
+// ============================================================================
+
+export type OpenRouterGenerateChatArgs = {
+  apiKey: string;
+  model?: string;
+  system?: string;
+  messages: { role: "user" | "assistant"; content: string }[];
+  providerRouting?: OpenRouterProviderRouting;
+  customFetch?: typeof globalThis.fetch;
+};
+
+export const openrouterGenerateChatResponse = async ({
+  apiKey,
+  model = OPENROUTER_DEFAULT_MODEL,
+  system,
+  messages,
+  providerRouting,
+  customFetch,
+}: OpenRouterGenerateChatArgs): Promise<OpenRouterGenerateTextOutput> => {
+  return retry({
+    retries: 3,
+    fn: async () => {
+      const client = createClient(apiKey, customFetch);
+
+      const chatMessages: OpenAI.Chat.ChatCompletionMessageParam[] = [];
+      if (system) {
+        chatMessages.push({ role: "system", content: system });
+      }
+      for (const msg of messages) {
+        chatMessages.push({ role: msg.role, content: msg.content });
+      }
+
+      const requestParams: OpenAI.Chat.ChatCompletionCreateParamsNonStreaming & {
+        provider?: OpenRouterProviderRouting;
+      } = {
+        messages: chatMessages,
+        model,
+        temperature: 1,
+        max_tokens: 1024,
+        top_p: 1,
+      };
+
+      if (providerRouting) {
+        requestParams.provider = providerRouting;
+      }
+
+      const response = await client.chat.completions.create(requestParams);
+
+      console.log("openrouter chat usage:", response.usage);
+      if (!response.choices || response.choices.length === 0) {
+        throw new Error("No response from OpenRouter");
+      }
+
+      const result = response.choices[0].message.content;
+      if (!result) {
+        throw new Error("Content is empty");
+      }
+
+      return {
+        text: result,
+        tokensUsed: response.usage?.total_tokens ?? countWords(result),
+      };
+    },
+  });
+};
+
+// ============================================================================
 // Test Integration
 // ============================================================================
 

@@ -170,6 +170,59 @@ export const groqGenerateTextResponse = async ({
   });
 };
 
+export type GroqGenerateChatArgs = {
+  apiKey: string;
+  model?: GenerateTextModel;
+  system?: string;
+  messages: { role: "user" | "assistant"; content: string }[];
+};
+
+export const groqGenerateChatResponse = async ({
+  apiKey,
+  model = "meta-llama/llama-4-scout-17b-16e-instruct",
+  system,
+  messages,
+}: GroqGenerateChatArgs): Promise<GroqGenerateResponseOutput> => {
+  return retry({
+    retries: 3,
+    fn: async () => {
+      const client = createClient(apiKey);
+
+      const chatMessages: ChatCompletionMessageParam[] = [];
+      if (system) {
+        chatMessages.push({ role: "system", content: system });
+      }
+      for (const msg of messages) {
+        chatMessages.push({ role: msg.role, content: msg.content });
+      }
+
+      const response = await client.chat.completions.create({
+        messages: chatMessages,
+        model,
+        temperature: 1,
+        max_completion_tokens: 1024,
+        top_p: 1,
+      });
+
+      console.log("groq chat usage:", response.usage);
+      if (!response.choices || response.choices.length === 0) {
+        throw new Error("No response from Groq");
+      }
+
+      const result = response.choices[0].message.content;
+      if (!result) {
+        throw new Error("Content is empty");
+      }
+
+      const content = contentToString(result);
+      return {
+        text: content,
+        tokensUsed: response.usage?.total_tokens ?? countWords(content),
+      };
+    },
+  });
+};
+
 export type GroqTestIntegrationArgs = {
   apiKey: string;
 };

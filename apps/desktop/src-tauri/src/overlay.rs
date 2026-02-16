@@ -26,7 +26,7 @@ pub const AGENT_OVERLAY_TOP_OFFSET: f64 = 16.0;
 
 pub const QUICK_BAR_OVERLAY_LABEL: &str = "quick-bar-overlay";
 pub const QUICK_BAR_OVERLAY_WIDTH: f64 = 320.0;
-pub const QUICK_BAR_OVERLAY_HEIGHT: f64 = 44.0;
+pub const QUICK_BAR_OVERLAY_HEIGHT: f64 = 250.0;
 
 const CURSOR_POLL_INTERVAL_MS: u64 = 60;
 const DEFAULT_SCREEN_WIDTH: f64 = 1920.0;
@@ -206,7 +206,7 @@ pub fn ensure_quick_bar_overlay_window(app: &tauri::AppHandle) -> tauri::Result<
     let url = build_overlay_webview_url(app, "quick-bar-overlay")?;
 
     let x = (screen_width - QUICK_BAR_OVERLAY_WIDTH) / 2.0;
-    let y = screen_height * 0.85;
+    let y = screen_height * 0.85 - (QUICK_BAR_OVERLAY_HEIGHT - 44.0);
 
     let builder = {
         let builder = WebviewWindowBuilder::new(app, QUICK_BAR_OVERLAY_LABEL, url)
@@ -279,18 +279,6 @@ fn update_cursor_follower(app: &tauri::AppHandle, state: &CursorFollowerState) {
             AGENT_OVERLAY_WIDTH,
             AGENT_OVERLAY_HEIGHT,
             AGENT_OVERLAY_LEFT_OFFSET,
-        );
-    }
-
-    if let Some(quick_bar_window) = app.get_webview_window(QUICK_BAR_OVERLAY_LABEL) {
-        let quick_bar_bottom_offset = bottom_offset + PILL_OVERLAY_HEIGHT + 16.0;
-        crate::platform::position::set_overlay_position(
-            &quick_bar_window,
-            &monitor,
-            OverlayAnchor::BottomCenter,
-            QUICK_BAR_OVERLAY_WIDTH,
-            QUICK_BAR_OVERLAY_HEIGHT,
-            quick_bar_bottom_offset,
         );
     }
 

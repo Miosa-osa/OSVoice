@@ -1,11 +1,11 @@
 import { produce } from "immer";
-import { isEqual } from "lodash-es";
+import { shallow } from "zustand/shallow";
 import { createWithEqualityFn } from "zustand/traditional";
 import { INITIAL_APP_STATE, type AppState } from "../state/app.state";
 
 export const useAppStore = createWithEqualityFn<AppState>(
   () => INITIAL_APP_STATE,
-  isEqual,
+  shallow,
 );
 
 export const setAppState = useAppStore.setState;

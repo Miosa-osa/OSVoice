@@ -83,6 +83,50 @@ export const azureOpenAIGenerateText = async ({
   });
 };
 
+export type AzureOpenAIGenerateChatArgs = {
+  apiKey: string;
+  endpoint: string;
+  deploymentName: string;
+  system?: string;
+  messages: { role: "user" | "assistant"; content: string }[];
+};
+
+export const azureOpenAIGenerateChat = async ({
+  apiKey,
+  endpoint,
+  deploymentName,
+  system,
+  messages,
+}: AzureOpenAIGenerateChatArgs): Promise<AzureOpenAIGenerateResponseOutput> => {
+  return retry({
+    retries: 3,
+    fn: async () => {
+      const client = createClient(apiKey, endpoint);
+
+      const chatMessages: ChatCompletionMessageParam[] = [];
+      if (system) {
+        chatMessages.push({ role: "system", content: system });
+      }
+      for (const msg of messages) {
+        chatMessages.push({ role: msg.role, content: msg.content });
+      }
+
+      const response = await client.chat.completions.create({
+        messages: chatMessages,
+        model: deploymentName,
+        temperature: 1,
+        max_completion_tokens: 1024,
+      });
+
+      const content = response.choices?.[0]?.message?.content || "";
+      return {
+        text: content,
+        tokensUsed: response.usage?.total_tokens ?? countWords(content),
+      };
+    },
+  });
+};
+
 export type AzureOpenAITestIntegrationArgs = {
   apiKey: string;
   endpoint: string;

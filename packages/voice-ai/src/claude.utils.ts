@@ -91,6 +91,56 @@ export const claudeGenerateTextResponse = async ({
   });
 };
 
+export type ClaudeGenerateChatArgs = {
+  apiKey: string;
+  model?: ClaudeModel;
+  system?: string;
+  messages: { role: "user" | "assistant"; content: string }[];
+};
+
+export const claudeGenerateChatResponse = async ({
+  apiKey,
+  model = "claude-sonnet-4-20250514",
+  system,
+  messages,
+}: ClaudeGenerateChatArgs): Promise<ClaudeGenerateResponseOutput> => {
+  return retry({
+    retries: 3,
+    fn: async () => {
+      const client = createClient(apiKey);
+
+      const chatMessages = messages.map((msg) => ({
+        role: msg.role as "user" | "assistant",
+        content: msg.content,
+      }));
+
+      const response = await client.messages.create({
+        model,
+        max_tokens: 1024,
+        system: system ?? undefined,
+        messages: chatMessages,
+      });
+
+      console.log("claude chat usage:", response.usage);
+
+      const textBlock = response.content.find((block) => block.type === "text");
+      if (!textBlock || textBlock.type !== "text") {
+        throw new Error("No text response from Claude");
+      }
+
+      const content = textBlock.text;
+      const tokensUsed =
+        (response.usage?.input_tokens ?? 0) +
+        (response.usage?.output_tokens ?? 0);
+
+      return {
+        text: content,
+        tokensUsed: tokensUsed || countWords(content),
+      };
+    },
+  });
+};
+
 export type ClaudeTestIntegrationArgs = {
   apiKey: string;
 };
