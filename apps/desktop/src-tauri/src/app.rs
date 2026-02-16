@@ -99,6 +99,7 @@ pub fn build() -> tauri::Builder<tauri::Wry> {
 
                 app.manage(recorder);
                 app.manage(transcriber_state);
+                app.manage(crate::system::meeting_audio_store::MeetingAudioWriterState::new());
 
                 let pool_for_bg = pool.clone();
                 let app_handle_for_bg = app_handle.clone();
@@ -250,6 +251,17 @@ pub fn build() -> tauri::Builder<tauri::Wry> {
             crate::commands::conversation_delete,
             crate::commands::message_create,
             crate::commands::message_list,
+            crate::commands::meeting_create,
+            crate::commands::meeting_list,
+            crate::commands::meeting_update,
+            crate::commands::meeting_delete,
+            crate::commands::meeting_segment_list,
+            crate::commands::meeting_segments_create_batch,
+            crate::commands::meeting_segment_rename_speaker,
+            crate::commands::meeting_start_audio_writer,
+            crate::commands::meeting_append_audio_chunk,
+            crate::commands::meeting_finalize_audio_writer,
+            crate::commands::meeting_audio_load,
         ])
 }
 

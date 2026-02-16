@@ -12,3 +12,4 @@ export * from "./preferences.types";
 export * from "./tone.types";
 export * from "./openrouter.types";
 export * from "./conversation.types";
+export * from "./meeting.types";

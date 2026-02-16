@@ -5,6 +5,8 @@ import {
   Conversation,
   FullConfig,
   Hotkey,
+  Meeting,
+  MeetingSegment,
   Member,
   Message,
   Nullable,
@@ -25,6 +27,7 @@ import {
   INITIAL_ONBOARDING_STATE,
   type OnboardingState,
 } from "./onboarding.state";
+import { INITIAL_MEETING_STATE, MeetingState } from "./meeting.state";
 import { INITIAL_PAYMENT_STATE, PaymentState } from "./payment.state";
 import { INITIAL_PRICING_STATE, PricingState } from "./pricing.state";
 import { INITIAL_SETTINGS_STATE, SettingsState } from "./settings.state";
@@ -69,6 +72,8 @@ export type AppState = {
   toneById: Record<string, Tone>;
   conversationById: Record<string, Conversation>;
   messageById: Record<string, Message>;
+  meetingById: Record<string, Meeting>;
+  meetingSegmentById: Record<string, MeetingSegment>;
   config: Nullable<FullConfig>;
   priceValueByKey: Record<string, PriceValue>;
 
@@ -84,6 +89,7 @@ export type AppState = {
   login: LoginState;
   agent: AgentState;
   chat: ChatState;
+  meeting: MeetingState;
 
   snackbarMessage?: string;
   snackbarCounter: number;
@@ -111,6 +117,8 @@ export const INITIAL_APP_STATE: AppState = {
   toneById: {},
   conversationById: {},
   messageById: {},
+  meetingById: {},
+  meetingSegmentById: {},
   overlayPhase: "idle",
   audioLevels: [],
   permissions: {
@@ -132,6 +140,7 @@ export const INITIAL_APP_STATE: AppState = {
   overlayCursor: null,
   agent: INITIAL_AGENT_STATE,
   chat: INITIAL_CHAT_STATE,
+  meeting: INITIAL_MEETING_STATE,
   onboarding: INITIAL_ONBOARDING_STATE,
   transcriptions: INITIAL_TRANSCRIPTIONS_STATE,
   dictionary: INITIAL_DICTIONARY_STATE,
