@@ -16,6 +16,7 @@ type LocalMessage = {
   content: string;
   model?: string | null;
   tokensUsed?: number | null;
+  contextJson?: string | null;
   createdAt: string;
 };
 
@@ -40,6 +41,7 @@ const toLocalMessage = (m: Message): LocalMessage => ({
   content: m.content,
   model: m.model ?? null,
   tokensUsed: m.tokensUsed ?? null,
+  contextJson: m.contextJson ?? null,
   createdAt: m.createdAt,
 });
 
@@ -54,6 +56,7 @@ const fromLocalMessage = (m: LocalMessage): Message => ({
   content: m.content,
   model: m.model ?? undefined,
   tokensUsed: m.tokensUsed ?? undefined,
+  contextJson: m.contextJson ?? undefined,
   createdAt: m.createdAt,
 });
 

@@ -8,24 +8,31 @@ import {
 import {
   azureOpenAIGenerateChat,
   azureOpenAIGenerateText,
+  azureOpenAIStreamChat,
   claudeGenerateChatResponse,
   claudeGenerateTextResponse,
+  claudeStreamChatResponse,
   ClaudeModel,
   deepseekGenerateChatResponse,
   deepseekGenerateTextResponse,
+  deepseekStreamChatResponse,
   DeepseekModel,
   geminiGenerateChatResponse,
   geminiGenerateTextResponse,
+  geminiStreamChatResponse,
   GeminiGenerateTextModel,
   GenerateTextModel,
   groqGenerateChatResponse,
   groqGenerateTextResponse,
+  groqStreamChatResponse,
   openaiGenerateChatResponse,
   OpenAIGenerateTextModel,
   openaiGenerateTextResponse,
+  openaiStreamChatResponse,
   OPENROUTER_DEFAULT_MODEL,
   openrouterGenerateChatResponse,
   openrouterGenerateTextResponse,
+  openrouterStreamChatResponse,
 } from "@repo/voice-ai";
 import { fetch as tauriFetch } from "@tauri-apps/plugin-http";
 import { PostProcessingMode } from "../types/ai.types";
@@ -42,6 +49,12 @@ export type GenerateChatInput = {
   messages: ChatMessage[];
 };
 
+export type GenerateChatStreamInput = {
+  system?: Nullable<string>;
+  messages: ChatMessage[];
+  onChunk: (delta: string) => void;
+};
+
 export type GenerateTextMetadata = {
   postProcessingMode?: Nullable<PostProcessingMode>;
   inferenceDevice?: Nullable<string>;
@@ -55,6 +68,9 @@ export type GenerateTextOutput = {
 export abstract class BaseGenerateTextRepo extends BaseRepo {
   abstract generateText(input: GenerateTextInput): Promise<GenerateTextOutput>;
   abstract generateChat(input: GenerateChatInput): Promise<GenerateTextOutput>;
+  abstract generateChatStream(
+    input: GenerateChatStreamInput,
+  ): Promise<GenerateTextOutput>;
 }
 
 export class CloudGenerateTextRepo extends BaseGenerateTextRepo {
@@ -96,6 +112,17 @@ export class CloudGenerateTextRepo extends BaseGenerateTextRepo {
       prompt,
     });
   }
+
+  async generateChatStream(
+    input: GenerateChatStreamInput,
+  ): Promise<GenerateTextOutput> {
+    const result = await this.generateChat({
+      system: input.system,
+      messages: input.messages,
+    });
+    input.onChunk(result.text);
+    return result;
+  }
 }
 
 export class GroqGenerateTextRepo extends BaseGenerateTextRepo {
@@ -134,6 +161,26 @@ export class GroqGenerateTextRepo extends BaseGenerateTextRepo {
       model: this.model,
       system: input.system ?? undefined,
       messages: input.messages,
+    });
+
+    return {
+      text: response.text,
+      metadata: {
+        postProcessingMode: "api",
+        inferenceDevice: "API • Groq",
+      },
+    };
+  }
+
+  async generateChatStream(
+    input: GenerateChatStreamInput,
+  ): Promise<GenerateTextOutput> {
+    const response = await groqStreamChatResponse({
+      apiKey: this.groqApiKey,
+      model: this.model,
+      system: input.system ?? undefined,
+      messages: input.messages,
+      onChunk: input.onChunk,
     });
 
     return {
@@ -190,6 +237,26 @@ export class OpenAIGenerateTextRepo extends BaseGenerateTextRepo {
       },
     };
   }
+
+  async generateChatStream(
+    input: GenerateChatStreamInput,
+  ): Promise<GenerateTextOutput> {
+    const response = await openaiStreamChatResponse({
+      apiKey: this.openaiApiKey,
+      model: this.model,
+      system: input.system ?? undefined,
+      messages: input.messages,
+      onChunk: input.onChunk,
+    });
+
+    return {
+      text: response.text,
+      metadata: {
+        postProcessingMode: "api",
+        inferenceDevice: "API • OpenAI",
+      },
+    };
+  }
 }
 
 export class OllamaGenerateTextRepo extends BaseGenerateTextRepo {
@@ -231,6 +298,28 @@ export class OllamaGenerateTextRepo extends BaseGenerateTextRepo {
       model: this.model,
       system: input.system ?? undefined,
       messages: input.messages,
+      customFetch: tauriFetch,
+    });
+
+    return {
+      text: response.text,
+      metadata: {
+        postProcessingMode: "api",
+        inferenceDevice: "API • Ollama",
+      },
+    };
+  }
+
+  async generateChatStream(
+    input: GenerateChatStreamInput,
+  ): Promise<GenerateTextOutput> {
+    const response = await openaiStreamChatResponse({
+      baseUrl: this.ollamaUrl,
+      apiKey: this.apiKey,
+      model: this.model,
+      system: input.system ?? undefined,
+      messages: input.messages,
+      onChunk: input.onChunk,
       customFetch: tauriFetch,
     });
 
@@ -296,6 +385,27 @@ export class OpenRouterGenerateTextRepo extends BaseGenerateTextRepo {
       },
     };
   }
+
+  async generateChatStream(
+    input: GenerateChatStreamInput,
+  ): Promise<GenerateTextOutput> {
+    const response = await openrouterStreamChatResponse({
+      apiKey: this.apiKey,
+      model: this.model,
+      system: input.system ?? undefined,
+      messages: input.messages,
+      onChunk: input.onChunk,
+      providerRouting: this.providerRouting,
+    });
+
+    return {
+      text: response.text,
+      metadata: {
+        postProcessingMode: "api",
+        inferenceDevice: "API • OpenRouter",
+      },
+    };
+  }
 }
 
 export class AzureOpenAIGenerateTextRepo extends BaseGenerateTextRepo {
@@ -336,6 +446,27 @@ export class AzureOpenAIGenerateTextRepo extends BaseGenerateTextRepo {
       deploymentName: this.deploymentName,
       system: input.system ?? undefined,
       messages: input.messages,
+    });
+
+    return {
+      text: response.text,
+      metadata: {
+        postProcessingMode: "api",
+        inferenceDevice: "API • Azure OpenAI",
+      },
+    };
+  }
+
+  async generateChatStream(
+    input: GenerateChatStreamInput,
+  ): Promise<GenerateTextOutput> {
+    const response = await azureOpenAIStreamChat({
+      apiKey: this.apiKey,
+      endpoint: this.endpoint,
+      deploymentName: this.deploymentName,
+      system: input.system ?? undefined,
+      messages: input.messages,
+      onChunk: input.onChunk,
     });
 
     return {
@@ -392,6 +523,26 @@ export class DeepseekGenerateTextRepo extends BaseGenerateTextRepo {
       },
     };
   }
+
+  async generateChatStream(
+    input: GenerateChatStreamInput,
+  ): Promise<GenerateTextOutput> {
+    const response = await deepseekStreamChatResponse({
+      apiKey: this.apiKey,
+      model: this.model,
+      system: input.system ?? undefined,
+      messages: input.messages,
+      onChunk: input.onChunk,
+    });
+
+    return {
+      text: response.text,
+      metadata: {
+        postProcessingMode: "api",
+        inferenceDevice: "API • DeepSeek",
+      },
+    };
+  }
 }
 
 export class GeminiGenerateTextRepo extends BaseGenerateTextRepo {
@@ -438,6 +589,26 @@ export class GeminiGenerateTextRepo extends BaseGenerateTextRepo {
       },
     };
   }
+
+  async generateChatStream(
+    input: GenerateChatStreamInput,
+  ): Promise<GenerateTextOutput> {
+    const response = await geminiStreamChatResponse({
+      apiKey: this.apiKey,
+      model: this.model,
+      system: input.system ?? undefined,
+      messages: input.messages,
+      onChunk: input.onChunk,
+    });
+
+    return {
+      text: response.text,
+      metadata: {
+        postProcessingMode: "api",
+        inferenceDevice: "API • Gemini",
+      },
+    };
+  }
 }
 
 export class ClaudeGenerateTextRepo extends BaseGenerateTextRepo {
@@ -474,6 +645,26 @@ export class ClaudeGenerateTextRepo extends BaseGenerateTextRepo {
       model: this.model,
       system: input.system ?? undefined,
       messages: input.messages,
+    });
+
+    return {
+      text: response.text,
+      metadata: {
+        postProcessingMode: "api",
+        inferenceDevice: "API • Claude",
+      },
+    };
+  }
+
+  async generateChatStream(
+    input: GenerateChatStreamInput,
+  ): Promise<GenerateTextOutput> {
+    const response = await claudeStreamChatResponse({
+      apiKey: this.apiKey,
+      model: this.model,
+      system: input.system ?? undefined,
+      messages: input.messages,
+      onChunk: input.onChunk,
     });
 
     return {

@@ -109,11 +109,15 @@ export const sendChatMessage = async (
 
   const trimmed = content.slice(0, MAX_MESSAGE_LENGTH);
 
+  const attachments = [...chat.pendingAttachments];
+
   const userMessage: Message = {
     id: createId(),
     conversationId,
     role: "user",
     content: trimmed,
+    contextJson:
+      attachments.length > 0 ? JSON.stringify(attachments) : undefined,
     createdAt: dayjs().toISOString(),
   };
 
@@ -138,6 +142,7 @@ export const sendChatMessage = async (
     ];
     draft.chat.isLoading = true;
     draft.chat.streamingMessageId = assistantMessageId;
+    draft.chat.pendingAttachments = [];
   });
 
   try {
@@ -168,8 +173,15 @@ export const sendChatMessage = async (
         content: m.content,
       }));
 
-    const systemPrompt =
+    let systemPrompt =
       "You are OSVoice, a helpful AI assistant. Be concise and clear.";
+
+    if (attachments.length > 0) {
+      const contextParts = attachments.map(
+        (a) => `[${a.type}: ${a.label}]\n${a.content}`,
+      );
+      systemPrompt += `\n\nThe user has attached the following context:\n\n${contextParts.join("\n\n")}`;
+    }
 
     activeStreamAbortController = new AbortController();
     const { signal } = activeStreamAbortController;

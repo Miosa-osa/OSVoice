@@ -3,6 +3,7 @@ import { Box, CircularProgress, IconButton, TextField } from "@mui/material";
 import { useCallback, useRef, useState } from "react";
 import { useIntl } from "react-intl";
 import { useVoiceRecording } from "../../hooks/voice-recording.hooks";
+import { ChatAttachmentBar } from "./ChatAttachmentBar";
 
 type ChatInputProps = {
   onSend: (content: string) => void;
@@ -62,6 +63,7 @@ export const ChatInput = ({
         backgroundColor: theme.vars?.palette.level0,
       })}
     >
+      <ChatAttachmentBar />
       <Box
         sx={(theme) => ({
           display: "flex",

@@ -250,6 +250,59 @@ export const geminiGenerateChatResponse = async ({
   });
 };
 
+export type GeminiStreamChatArgs = {
+  apiKey: string;
+  model?: GeminiGenerateTextModel;
+  system?: string;
+  messages: { role: "user" | "assistant"; content: string }[];
+  onChunk: (delta: string) => void;
+};
+
+export const geminiStreamChatResponse = async ({
+  apiKey,
+  model = "gemini-2.5-flash",
+  system,
+  messages,
+  onChunk,
+}: GeminiStreamChatArgs): Promise<GeminiGenerateResponseOutput> => {
+  const client = createClient(apiKey);
+
+  const contents = messages.map((msg) => ({
+    role: msg.role === "assistant" ? ("model" as const) : ("user" as const),
+    parts: [{ text: msg.content }],
+  }));
+
+  const config: Record<string, unknown> = {};
+  if (system) {
+    config.systemInstruction = system;
+  }
+
+  const response = await client.models.generateContentStream({
+    model,
+    contents,
+    config: Object.keys(config).length > 0 ? config : undefined,
+  });
+
+  let fullContent = "";
+
+  for await (const chunk of response) {
+    const text = chunk.text ?? "";
+    if (text) {
+      fullContent += text;
+      onChunk(text);
+    }
+  }
+
+  if (!fullContent) {
+    throw new Error("No response from Gemini");
+  }
+
+  return {
+    text: fullContent,
+    tokensUsed: countWords(fullContent),
+  };
+};
+
 export type GeminiTestIntegrationArgs = {
   apiKey: string;
 };

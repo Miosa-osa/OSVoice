@@ -1,8 +1,10 @@
-import { Box, keyframes, Typography } from "@mui/material";
-import { memo } from "react";
+import { DescriptionRounded } from "@mui/icons-material";
+import { Box, Chip, keyframes, Typography } from "@mui/material";
+import { memo, useMemo } from "react";
 import Markdown from "react-markdown";
 import rehypeSanitize from "rehype-sanitize";
 import remarkGfm from "remark-gfm";
+import type { MessageAttachment } from "../../state/chat.state";
 import { useAppStore } from "../../store";
 
 type ChatMessageBubbleProps = {
@@ -23,6 +25,15 @@ export const ChatMessageBubble = memo(
     const isStreamingThis = useAppStore(
       (state) => state.chat.streamingMessageId === messageId,
     );
+
+    const contextAttachments = useMemo<MessageAttachment[]>(() => {
+      if (!message?.contextJson) return [];
+      try {
+        return JSON.parse(message.contextJson) as MessageAttachment[];
+      } catch {
+        return [];
+      }
+    }, [message?.contextJson]);
 
     if (!message) return null;
 
@@ -51,6 +62,32 @@ export const ChatMessageBubble = memo(
             backdropFilter: isUser ? "none" : "blur(20px)",
           })}
         >
+          {contextAttachments.length > 0 && (
+            <Box
+              sx={{
+                display: "flex",
+                flexWrap: "wrap",
+                gap: 0.5,
+                mb: 1,
+              }}
+            >
+              {contextAttachments.map((a) => (
+                <Chip
+                  key={a.id}
+                  label={a.label}
+                  size="small"
+                  icon={<DescriptionRounded sx={{ fontSize: 12 }} />}
+                  sx={(theme) => ({
+                    backgroundColor: isUser
+                      ? "rgba(255,255,255,0.2)"
+                      : theme.vars?.palette.level2,
+                    fontSize: 11,
+                    height: 22,
+                  })}
+                />
+              ))}
+            </Box>
+          )}
           {isUser ? (
             <Typography
               variant="body2"
